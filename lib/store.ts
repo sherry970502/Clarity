@@ -1,7 +1,6 @@
 import { MindNode, NodeType, Priority, ViewMode } from './types'
 
-let _id = 10
-const gid = () => `n${++_id}`
+const gid = () => `n${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
 function node(id: string, title: string, type: NodeType, parentId: string | null, children: string[] = [], priority: Priority | null = null): MindNode {
   return { id, title, description: '', type, priority, children, parentId }
