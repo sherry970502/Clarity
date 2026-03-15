@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useCallback, useMemo } from 'react'
 import { MindNode, NODE_TYPE_META, PRIORITY_META } from '@/lib/types'
-import { calcLayout, NODE_W, NODE_H, H_GAP } from '@/lib/layout'
+import { calcLayout, NODE_W, NODE_H } from '@/lib/layout'
 import { AppState, Action } from '@/lib/store'
 
 interface Props {
@@ -10,10 +10,9 @@ interface Props {
 }
 
 export function MindMap({ state, dispatch }: Props) {
-  const { nodes, rootId, selectedId, panX, panY, dragId, dropId } = state
+  const { nodes, rootId, selectedId, selectedIds, panX, panY, dragId, dropId } = state
   const positions = useMemo(() => calcLayout(nodes, rootId), [nodes, rootId])
 
-  // Canvas bounding box
   const allPos = Object.values(positions)
   const minX = Math.min(...allPos.map(p => p.x), 0) - 120
   const minY = Math.min(...allPos.map(p => p.y), 0) - 120
@@ -22,7 +21,6 @@ export function MindMap({ state, dispatch }: Props) {
   const svgW = maxX - minX
   const svgH = maxY - minY
 
-  // Pan handling
   const panStart = useRef<{ x: number; y: number } | null>(null)
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -54,14 +52,19 @@ export function MindMap({ state, dispatch }: Props) {
       const y2 = cp.y - minY + NODE_H / 2
       const mx = (x1 + x2) / 2
       const childType = nodes[cid]?.type
-      const color = childType === 'dimension' ? '#94A3B8' : NODE_TYPE_META[childType ?? 'task'].color + '55'
+      const isSelected = selectedIds.includes(cid)
+      const color = isSelected
+        ? NODE_TYPE_META[childType ?? 'task'].color
+        : childType === 'dimension'
+        ? '#94A3B8'
+        : NODE_TYPE_META[childType ?? 'task'].color + '55'
       edges.push(
         <path
           key={`${id}-${cid}`}
           d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
           fill="none"
           stroke={color}
-          strokeWidth={dropId === cid ? 2 : 1.5}
+          strokeWidth={isSelected ? 2 : dropId === cid ? 2 : 1.5}
           strokeDasharray={nodes[cid]?.type === 'pending' ? '4 3' : undefined}
         />
       )
@@ -79,14 +82,17 @@ export function MindMap({ state, dispatch }: Props) {
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
-      onClick={() => dispatch({ type: 'CLOSE_CTX' })}
+      onClick={e => {
+        if ((e.target as HTMLElement).closest('[data-node]')) return
+        dispatch({ type: 'CLEAR_SELECTION' })
+        dispatch({ type: 'CLOSE_CTX' })
+      }}
     >
       <div style={{
         position: 'absolute',
         transform: `translate(${panX}px, ${panY}px)`,
         width: svgW, height: svgH,
       }}>
-        {/* SVG edges */}
         <svg
           style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', overflow: 'visible' }}
           width={svgW} height={svgH}
@@ -94,7 +100,6 @@ export function MindMap({ state, dispatch }: Props) {
           {edges}
         </svg>
 
-        {/* Node cards */}
         {Object.entries(positions).map(([id, pos]) => {
           const n = nodes[id]
           if (!n) return null
@@ -105,6 +110,7 @@ export function MindMap({ state, dispatch }: Props) {
               x={pos.x - minX}
               y={pos.y - minY}
               selected={selectedId === id}
+              multiSelected={selectedIds.includes(id)}
               isDragging={dragId === id}
               isDropTarget={dropId === id}
               isRoot={!n.parentId}
@@ -115,7 +121,20 @@ export function MindMap({ state, dispatch }: Props) {
         })}
       </div>
 
-      {/* Grid dots for visual depth */}
+      {/* Multi-select badge */}
+      {selectedIds.length > 1 && (
+        <div style={{
+          position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+          background: '#4F46E5', color: '#fff', borderRadius: 20,
+          padding: '4px 14px', fontSize: 12, fontWeight: 600,
+          boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
+          pointerEvents: 'none',
+        }}>
+          已选 {selectedIds.length} 个节点 · Shift+点击可继续添加
+        </div>
+      )}
+
+      {/* Grid dots */}
       <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         <defs>
           <pattern id="grid" x={panX % 24} y={panY % 24} width={24} height={24} patternUnits="userSpaceOnUse">
@@ -133,6 +152,7 @@ interface NodeCardProps {
   x: number
   y: number
   selected: boolean
+  multiSelected: boolean
   isDragging: boolean
   isDropTarget: boolean
   isRoot: boolean
@@ -140,27 +160,27 @@ interface NodeCardProps {
   dispatch: (a: Action) => void
 }
 
-function NodeCard({ node, x, y, selected, isDragging, isDropTarget, isRoot, dragId, dispatch }: NodeCardProps) {
+function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarget, isRoot, dragId, dispatch }: NodeCardProps) {
   const meta = NODE_TYPE_META[node.type]
   const isDimension = node.type === 'dimension'
-
-  const w = NODE_W
-  const h = NODE_H
+  const isHighlighted = selected || multiSelected
 
   const border = isDropTarget
     ? '2px solid #4F46E5'
-    : selected
+    : isHighlighted
     ? `2px solid ${meta.color}`
     : `1.5px solid ${isDimension ? '#CBD5E1' : '#E8ECF0'}`
 
   const bg = isDropTarget
     ? '#EEF2FF'
+    : multiSelected && !selected
+    ? meta.bg
     : isDimension
     ? '#F1F5F9'
     : '#FFFFFF'
 
-  const shadow = selected
-    ? `0 0 0 3px ${meta.color}22, 0 4px 16px rgba(0,0,0,0.08)`
+  const shadow = isHighlighted
+    ? `0 0 0 3px ${meta.color}${multiSelected && !selected ? '33' : '22'}, 0 4px 16px rgba(0,0,0,0.08)`
     : isDimension
     ? '0 2px 8px rgba(0,0,0,0.06)'
     : '0 1px 4px rgba(0,0,0,0.06)'
@@ -169,21 +189,23 @@ function NodeCard({ node, x, y, selected, isDragging, isDropTarget, isRoot, drag
     <div
       data-node={node.id}
       style={{
-        position: 'absolute',
-        left: x, top: y,
-        width: w, height: h,
-        background: bg,
-        border,
-        borderRadius: isDimension ? 10 : 8,
-        boxShadow: shadow,
-        display: 'flex', alignItems: 'center',
-        cursor: 'pointer',
-        opacity: isDragging ? 0.4 : 1,
+        position: 'absolute', left: x, top: y,
+        width: NODE_W, height: NODE_H,
+        background: bg, border, borderRadius: isDimension ? 10 : 8,
+        boxShadow: shadow, display: 'flex', alignItems: 'center',
+        cursor: 'pointer', opacity: isDragging ? 0.4 : 1,
         transition: 'box-shadow 0.15s, border-color 0.15s, opacity 0.15s',
         userSelect: 'none',
       }}
       draggable={!isRoot}
-      onClick={e => { e.stopPropagation(); dispatch({ type: 'SELECT', id: node.id }) }}
+      onClick={e => {
+        e.stopPropagation()
+        if (e.shiftKey) {
+          dispatch({ type: 'MULTI_SELECT', id: node.id })
+        } else {
+          dispatch({ type: 'SELECT', id: node.id })
+        }
+      }}
       onContextMenu={e => {
         e.preventDefault()
         e.stopPropagation()
@@ -195,11 +217,7 @@ function NodeCard({ node, x, y, selected, isDragging, isDropTarget, isRoot, drag
         e.dataTransfer.effectAllowed = 'move'
       }}
       onDragEnd={() => dispatch({ type: 'DRAG_OVER', nodeId: null })}
-      onDragOver={e => {
-        e.preventDefault()
-        e.stopPropagation()
-        dispatch({ type: 'DRAG_OVER', nodeId: node.id })
-      }}
+      onDragOver={e => { e.preventDefault(); e.stopPropagation(); dispatch({ type: 'DRAG_OVER', nodeId: node.id }) }}
       onDrop={e => {
         e.preventDefault()
         e.stopPropagation()
@@ -208,11 +226,9 @@ function NodeCard({ node, x, y, selected, isDragging, isDropTarget, isRoot, drag
     >
       {/* Left color bar */}
       <div style={{
-        width: isDimension ? 5 : 4,
-        alignSelf: 'stretch',
+        width: isDimension ? 5 : 4, alignSelf: 'stretch',
         borderRadius: isDimension ? '10px 0 0 10px' : '8px 0 0 8px',
-        background: meta.color,
-        flexShrink: 0,
+        background: meta.color, flexShrink: 0,
       }} />
 
       {/* Content */}
@@ -223,8 +239,7 @@ function NodeCard({ node, x, y, selected, isDragging, isDropTarget, isRoot, drag
           </div>
         )}
         <div style={{
-          fontSize: isDimension ? 13 : 13,
-          fontWeight: isDimension ? 600 : 500,
+          fontSize: 13, fontWeight: isDimension ? 600 : 500,
           color: isDimension ? '#1E293B' : '#334155',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           lineHeight: isDimension ? '1.2' : '1.4',
@@ -238,20 +253,24 @@ function NodeCard({ node, x, y, selected, isDragging, isDropTarget, isRoot, drag
         )}
       </div>
 
-      {/* Right: description dot + priority */}
+      {/* Right: multi-select check + description dot + priority */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingRight: 10, flexShrink: 0 }}>
-        {node.description && (
+        {multiSelected && (
+          <div style={{
+            width: 14, height: 14, borderRadius: '50%',
+            background: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>
+          </div>
+        )}
+        {node.description && !multiSelected && (
           <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#CBD5E1' }} title="有描述" />
         )}
-        {node.priority && (
-          <div style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: PRIORITY_META[node.priority].color,
-          }} />
+        {node.priority && !multiSelected && (
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_META[node.priority].color }} />
         )}
       </div>
 
-      {/* Drop indicator line */}
       {isDropTarget && (
         <div style={{
           position: 'absolute', bottom: -3, left: 12, right: 12,

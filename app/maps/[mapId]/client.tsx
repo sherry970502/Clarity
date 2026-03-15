@@ -30,6 +30,7 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName }: P
     nodes: initialNodes,
     rootId,
     selectedId: null,
+    selectedIds: [],
     view: 'mindmap',
     ctx: null,
     panX: 0,
@@ -86,12 +87,22 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName }: P
       dispatch({ type: 'ADD_SIBLING', nodeId: sel })
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && sel && sel !== state.rootId) {
       e.preventDefault()
-      dispatch({ type: 'DELETE', nodeId: sel })
+      if (state.selectedIds.length > 1) {
+        dispatch({ type: 'DELETE_MULTI', ids: state.selectedIds })
+      } else {
+        dispatch({ type: 'DELETE', nodeId: sel })
+      }
+    } else if (e.key === 'ArrowUp' && e.altKey && sel && sel !== state.rootId) {
+      e.preventDefault()
+      dispatch({ type: 'MOVE_UP', nodeId: sel })
+    } else if (e.key === 'ArrowDown' && e.altKey && sel && sel !== state.rootId) {
+      e.preventDefault()
+      dispatch({ type: 'MOVE_DOWN', nodeId: sel })
     } else if (e.key === 'Escape') {
-      dispatch({ type: 'SELECT', id: null })
+      dispatch({ type: 'CLEAR_SELECTION' })
       dispatch({ type: 'CLOSE_CTX' })
     }
-  }, [state.selectedId, state.rootId])
+  }, [state.selectedId, state.selectedIds, state.rootId])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -196,8 +207,11 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName }: P
         <DetailPanel
           node={selNode}
           isNew={state.newNodeId === state.selectedId && state.newNodeId !== null}
-          onClose={() => dispatch({ type: 'SELECT', id: null })}
+          selectedIds={state.selectedIds}
+          onClose={() => dispatch({ type: 'CLEAR_SELECTION' })}
           onUpdate={patch => state.selectedId && dispatch({ type: 'UPDATE', nodeId: state.selectedId, patch })}
+          onUpdateMulti={patch => dispatch({ type: 'UPDATE_MULTI', ids: state.selectedIds, patch })}
+          onDeleteMulti={() => dispatch({ type: 'DELETE_MULTI', ids: state.selectedIds })}
           onClearNew={() => dispatch({ type: 'CLEAR_NEW' })}
         />
       </div>
@@ -213,6 +227,8 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName }: P
           onDelete={() => { dispatch({ type: 'DELETE', nodeId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onChangeType={(t: NodeType) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { type: t } }); dispatch({ type: 'CLOSE_CTX' }) }}
           onChangePriority={(p: Priority | null) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { priority: p } }); dispatch({ type: 'CLOSE_CTX' }) }}
+          onMoveUp={() => dispatch({ type: 'MOVE_UP', nodeId: state.ctx!.nodeId })}
+          onMoveDown={() => dispatch({ type: 'MOVE_DOWN', nodeId: state.ctx!.nodeId })}
           onClose={() => dispatch({ type: 'CLOSE_CTX' })}
         />
       )}

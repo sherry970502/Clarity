@@ -1,4 +1,4 @@
-export type NodeType = 'goal' | 'issue' | 'task' | 'pending' | 'dimension'
+export type NodeType = 'goal' | 'project' | 'issue' | 'task' | 'pending' | 'dimension'
 export type Priority = 'high' | 'medium' | 'low'
 export type ViewMode = 'mindmap' | 'list'
 
@@ -14,6 +14,7 @@ export interface MindNode {
 
 export const NODE_TYPE_META: Record<NodeType, { label: string; color: string; bg: string }> = {
   goal:      { label: '目标', color: '#4F46E5', bg: '#EEF2FF' },
+  project:   { label: '项目', color: '#7C3AED', bg: '#F5F3FF' },
   issue:     { label: '议题', color: '#D97706', bg: '#FFFBEB' },
   task:      { label: '任务', color: '#059669', bg: '#ECFDF5' },
   pending:   { label: '待定', color: '#64748B', bg: '#F8FAFC' },

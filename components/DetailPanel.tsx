@@ -5,12 +5,15 @@ import { MindNode, NodeType, Priority, NODE_TYPE_META, PRIORITY_META } from '@/l
 interface Props {
   node: MindNode | null
   isNew: boolean
+  selectedIds: string[]
   onClose: () => void
   onUpdate: (patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority'>>) => void
+  onUpdateMulti: (patch: Partial<Pick<MindNode, 'type' | 'priority'>>) => void
+  onDeleteMulti: () => void
   onClearNew: () => void
 }
 
-export function DetailPanel({ node, isNew, onClose, onUpdate, onClearNew }: Props) {
+export function DetailPanel({ node, isNew, selectedIds, onClose, onUpdate, onUpdateMulti, onDeleteMulti, onClearNew }: Props) {
   const titleRef = useRef<HTMLInputElement>(null)
   const descRef = useRef<HTMLTextAreaElement>(null)
 
@@ -21,6 +24,57 @@ export function DetailPanel({ node, isNew, onClose, onUpdate, onClearNew }: Prop
       onClearNew()
     }
   }, [isNew, node, onClearNew])
+
+  // Multi-select batch panel
+  if (selectedIds.length > 1) {
+    return (
+      <div style={{
+        width: 280, flexShrink: 0, height: '100%', overflowY: 'auto',
+        background: '#fff', borderLeft: '1px solid #E2E8F0',
+        display: 'flex', flexDirection: 'column',
+        fontFamily: 'system-ui, sans-serif',
+      }}>
+        <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#4F46E5' }}>已选 {selectedIds.length} 个节点</span>
+          <span style={{ flex: 1 }} />
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: 16, flex: 1 }}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 11, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>批量改类型</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {(Object.keys(NODE_TYPE_META) as NodeType[]).map(t => {
+                const m = NODE_TYPE_META[t]
+                return (
+                  <button key={t} onClick={() => onUpdateMulti({ type: t })}
+                    style={{ padding: '5px 10px', borderRadius: 5, cursor: 'pointer', fontSize: 12, fontFamily: 'inherit', border: `1.5px solid ${m.color}44`, background: m.bg, color: m.color }}>
+                    {m.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: 11, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>批量改优先级</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => onUpdateMulti({ priority: null })} style={batchBtnStyle('#CBD5E1')}>无</button>
+              {(Object.keys(PRIORITY_META) as Priority[]).map(p => (
+                <button key={p} onClick={() => onUpdateMulti({ priority: p })} style={batchBtnStyle(PRIORITY_META[p].color)}>
+                  {PRIORITY_META[p].label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={onDeleteMulti}
+            style={{ width: '100%', padding: '9px', borderRadius: 8, border: '1.5px solid #FCA5A5', background: '#FEF2F2', color: '#EF4444', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            删除选中节点（{selectedIds.length}）
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (!node) return null
 
@@ -159,6 +213,14 @@ export function DetailPanel({ node, isNew, onClose, onUpdate, onClearNew }: Prop
       </div>
     </div>
   )
+}
+
+function batchBtnStyle(color: string): React.CSSProperties {
+  return {
+    padding: '5px 10px', borderRadius: 5, cursor: 'pointer', fontSize: 12,
+    fontFamily: 'inherit', border: `1.5px solid ${color}55`,
+    background: color + '18', color, fontWeight: 500,
+  }
 }
 
 function PrioBtn({ label, color, active, onClick }: { label: string; color: string; active: boolean; onClick: () => void }) {

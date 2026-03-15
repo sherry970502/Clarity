@@ -1,7 +1,7 @@
 'use client'
 import { MindNode, NodeType, Priority, NODE_TYPE_META, PRIORITY_META } from '@/lib/types'
 
-const LIST_TYPES: NodeType[] = ['goal', 'task', 'issue', 'pending']
+const LIST_TYPES: NodeType[] = ['goal', 'project', 'task', 'issue', 'pending']
 
 const PRIORITY_ORDER: (Priority | null)[] = ['high', 'medium', 'low', null]
 

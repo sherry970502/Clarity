@@ -12,10 +12,12 @@ interface Props {
   onDelete: () => void
   onChangeType: (t: NodeType) => void
   onChangePriority: (p: Priority | null) => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
   onClose: () => void
 }
 
-export function ContextMenu({ x, y, nodeId, isRoot, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onClose }: Props) {
+export function ContextMenu({ x, y, nodeId, isRoot, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onMoveUp, onMoveDown, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -48,6 +50,9 @@ export function ContextMenu({ x, y, nodeId, isRoot, onAddChild, onAddSibling, on
     >
       <Item label="新增子节点" onClick={onAddChild} />
       {!isRoot && <Item label="新增同级节点" onClick={onAddSibling} />}
+      {!isRoot && sep}
+      {!isRoot && <Item label="上移" onClick={() => { onMoveUp?.(); onClose() }} />}
+      {!isRoot && <Item label="下移" onClick={() => { onMoveDown?.(); onClose() }} />}
       {sep}
       <div style={{ padding: '4px 12px 2px', fontSize: 10, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>切换类型</div>
       {(Object.keys(NODE_TYPE_META) as NodeType[]).map(t => (

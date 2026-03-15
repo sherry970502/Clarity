@@ -35,20 +35,22 @@ export interface ContextMenu { x: number; y: number; nodeId: string }
 export interface AppState {
   nodes: Record<string, MindNode>
   rootId: string
-  selectedId: string | null
+  selectedId: string | null       // primary selection (detail panel / ctx)
+  selectedIds: string[]           // all selected (multi-select)
   view: ViewMode
   ctx: ContextMenu | null
   panX: number
   panY: number
   dragId: string | null
   dropId: string | null
-  newNodeId: string | null   // triggers focus-title in detail panel
+  newNodeId: string | null
 }
 
 export const initialState: AppState = {
   nodes: INITIAL_NODES,
   rootId: ROOT,
   selectedId: null,
+  selectedIds: [],
   view: 'mindmap',
   ctx: null,
   panX: 0,
@@ -60,10 +62,16 @@ export const initialState: AppState = {
 
 export type Action =
   | { type: 'SELECT'; id: string | null }
+  | { type: 'MULTI_SELECT'; id: string }       // shift+click: toggle in selectedIds
+  | { type: 'CLEAR_SELECTION' }
   | { type: 'ADD_CHILD'; parentId: string }
   | { type: 'ADD_SIBLING'; nodeId: string }
   | { type: 'DELETE'; nodeId: string }
+  | { type: 'DELETE_MULTI'; ids: string[] }
   | { type: 'UPDATE'; nodeId: string; patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority'>> }
+  | { type: 'UPDATE_MULTI'; ids: string[]; patch: Partial<Pick<MindNode, 'type' | 'priority'>> }
+  | { type: 'MOVE_UP'; nodeId: string }
+  | { type: 'MOVE_DOWN'; nodeId: string }
   | { type: 'SET_VIEW'; view: ViewMode }
   | { type: 'OPEN_CTX'; x: number; y: number; nodeId: string }
   | { type: 'CLOSE_CTX' }
@@ -76,7 +84,19 @@ export type Action =
 export function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
     case 'SELECT':
-      return { ...s, selectedId: a.id, ctx: null }
+      return { ...s, selectedId: a.id, selectedIds: a.id ? [a.id] : [], ctx: null }
+
+    case 'MULTI_SELECT': {
+      const already = s.selectedIds.includes(a.id)
+      const selectedIds = already
+        ? s.selectedIds.filter(id => id !== a.id)
+        : [...s.selectedIds, a.id]
+      const selectedId = selectedIds.length > 0 ? selectedIds[selectedIds.length - 1] : null
+      return { ...s, selectedId, selectedIds, ctx: null }
+    }
+
+    case 'CLEAR_SELECTION':
+      return { ...s, selectedId: null, selectedIds: [], ctx: null }
 
     case 'ADD_CHILD': {
       const id = gid()
@@ -90,6 +110,7 @@ export function reducer(s: AppState, a: Action): AppState {
           [a.parentId]: { ...parent, children: [...parent.children, id] },
         },
         selectedId: id,
+        selectedIds: [id],
         newNodeId: id,
         ctx: null,
       }
@@ -111,6 +132,7 @@ export function reducer(s: AppState, a: Action): AppState {
           [n.parentId]: { ...parent, children },
         },
         selectedId: id,
+        selectedIds: [id],
         newNodeId: id,
         ctx: null,
       }
@@ -133,8 +155,28 @@ export function reducer(s: AppState, a: Action): AppState {
         ...s,
         nodes: newNodes,
         selectedId: toDelete.has(s.selectedId ?? '') ? null : s.selectedId,
+        selectedIds: s.selectedIds.filter(id => !toDelete.has(id)),
         ctx: null,
       }
+    }
+
+    case 'DELETE_MULTI': {
+      const toDelete = new Set<string>()
+      const collect = (id: string) => {
+        toDelete.add(id)
+        s.nodes[id]?.children.forEach(collect)
+      }
+      // Only delete non-root nodes
+      a.ids.filter(id => s.nodes[id]?.parentId).forEach(collect)
+      const newNodes = { ...s.nodes }
+      toDelete.forEach(id => {
+        const n = newNodes[id]
+        if (n?.parentId && newNodes[n.parentId]) {
+          newNodes[n.parentId] = { ...newNodes[n.parentId], children: newNodes[n.parentId].children.filter(c => c !== id) }
+        }
+        delete newNodes[id]
+      })
+      return { ...s, nodes: newNodes, selectedId: null, selectedIds: [], ctx: null }
     }
 
     case 'UPDATE': {
@@ -143,10 +185,40 @@ export function reducer(s: AppState, a: Action): AppState {
       return { ...s, nodes: { ...s.nodes, [a.nodeId]: { ...n, ...a.patch } } }
     }
 
+    case 'UPDATE_MULTI': {
+      const newNodes = { ...s.nodes }
+      for (const id of a.ids) {
+        if (newNodes[id]) newNodes[id] = { ...newNodes[id], ...a.patch }
+      }
+      return { ...s, nodes: newNodes }
+    }
+
+    case 'MOVE_UP': {
+      const n = s.nodes[a.nodeId]
+      if (!n || !n.parentId) return s
+      const parent = s.nodes[n.parentId]
+      const idx = parent.children.indexOf(a.nodeId)
+      if (idx <= 0) return s
+      const children = [...parent.children]
+      ;[children[idx - 1], children[idx]] = [children[idx], children[idx - 1]]
+      return { ...s, nodes: { ...s.nodes, [n.parentId]: { ...parent, children } }, ctx: null }
+    }
+
+    case 'MOVE_DOWN': {
+      const n = s.nodes[a.nodeId]
+      if (!n || !n.parentId) return s
+      const parent = s.nodes[n.parentId]
+      const idx = parent.children.indexOf(a.nodeId)
+      if (idx >= parent.children.length - 1) return s
+      const children = [...parent.children]
+      ;[children[idx], children[idx + 1]] = [children[idx + 1], children[idx]]
+      return { ...s, nodes: { ...s.nodes, [n.parentId]: { ...parent, children } }, ctx: null }
+    }
+
     case 'SET_VIEW': return { ...s, view: a.view }
 
     case 'OPEN_CTX':
-      return { ...s, ctx: { x: a.x, y: a.y, nodeId: a.nodeId }, selectedId: a.nodeId }
+      return { ...s, ctx: { x: a.x, y: a.y, nodeId: a.nodeId }, selectedId: a.nodeId, selectedIds: s.selectedIds.includes(a.nodeId) ? s.selectedIds : [a.nodeId] }
 
     case 'CLOSE_CTX': return { ...s, ctx: null }
 
