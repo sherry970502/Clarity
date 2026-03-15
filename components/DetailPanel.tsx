@@ -7,7 +7,7 @@ interface Props {
   isNew: boolean
   selectedIds: string[]
   onClose: () => void
-  onUpdate: (patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority'>>) => void
+  onUpdate: (patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'url'>>) => void
   onUpdateMulti: (patch: Partial<Pick<MindNode, 'type' | 'priority'>>) => void
   onDeleteMulti: () => void
   onClearNew: () => void
@@ -185,6 +185,46 @@ export function DetailPanel({ node, isNew, selectedIds, onClose, onUpdate, onUpd
               )
             })}
           </div>
+        </div>
+
+        {/* URL */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+            链接
+          </label>
+          <input
+            key={node.id + '-url'}
+            defaultValue={node.url ?? ''}
+            placeholder="https://..."
+            onBlur={e => {
+              const val = e.target.value.trim()
+              onUpdate({ url: val || undefined })
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              border: '1px solid #E2E8F0', borderRadius: 6,
+              padding: '8px 10px', fontSize: 13, color: '#334155',
+              outline: 'none', fontFamily: 'inherit',
+              background: '#FAFAFA',
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = '#4F46E5')}
+            onBlurCapture={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
+          />
+          {node.url && (
+            <a
+              href={node.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                marginTop: 8, fontSize: 12, color: '#4F46E5',
+                textDecoration: 'none', fontWeight: 500,
+              }}
+            >
+              <span style={{ fontSize: 13 }}>↗</span> 打开链接
+            </a>
+          )}
         </div>
 
         {/* Priority */}

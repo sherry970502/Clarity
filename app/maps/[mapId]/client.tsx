@@ -46,7 +46,19 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
     collapsedIds: [],
   }
 
-  const [state, dispatch] = useReducer(reducer, initialAppState)
+  const [state, dispatch] = useReducer(reducer, initialAppState, (base) => {
+    try {
+      const saved = localStorage.getItem(`clarity-collapsed-${mapId}`)
+      return { ...base, collapsedIds: saved ? JSON.parse(saved) : [] }
+    } catch {
+      return base
+    }
+  })
+
+  // Persist collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem(`clarity-collapsed-${mapId}`, JSON.stringify(state.collapsedIds))
+  }, [state.collapsedIds, mapId])
 
   // Auto-save nodes with debounce
   useEffect(() => {

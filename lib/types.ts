@@ -10,6 +10,7 @@ export interface MindNode {
   type: NodeType
   priority: Priority | null
   status?: Status   // undefined = 未开始
+  url?: string
   children: string[]
   parentId: string | null
 }

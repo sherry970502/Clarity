@@ -74,7 +74,7 @@ export type Action =
   | { type: 'ADD_SIBLING'; nodeId: string }
   | { type: 'DELETE'; nodeId: string }
   | { type: 'DELETE_MULTI'; ids: string[] }
-  | { type: 'UPDATE'; nodeId: string; patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'status'>> }
+  | { type: 'UPDATE'; nodeId: string; patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'status' | 'url'>> }
   | { type: 'UPDATE_MULTI'; ids: string[]; patch: Partial<Pick<MindNode, 'type' | 'priority'>> }
   | { type: 'MOVE_UP'; nodeId: string }
   | { type: 'MOVE_DOWN'; nodeId: string }
