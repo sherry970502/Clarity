@@ -35,6 +35,7 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName }: P
     ctx: null,
     panX: 0,
     panY: 0,
+    scale: 1,
     dragId: null,
     dropId: null,
     newNodeId: null,

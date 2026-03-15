@@ -13,7 +13,7 @@ export interface MindNode {
 }
 
 export const NODE_TYPE_META: Record<NodeType, { label: string; color: string; bg: string }> = {
-  goal:      { label: '目标', color: '#4F46E5', bg: '#EEF2FF' },
+  goal:      { label: '目标', color: '#E11D48', bg: '#FFF1F2' },
   project:   { label: '项目', color: '#7C3AED', bg: '#F5F3FF' },
   issue:     { label: '议题', color: '#D97706', bg: '#FFFBEB' },
   task:      { label: '任务', color: '#059669', bg: '#ECFDF5' },

@@ -35,12 +35,13 @@ export interface ContextMenu { x: number; y: number; nodeId: string }
 export interface AppState {
   nodes: Record<string, MindNode>
   rootId: string
-  selectedId: string | null       // primary selection (detail panel / ctx)
-  selectedIds: string[]           // all selected (multi-select)
+  selectedId: string | null
+  selectedIds: string[]
   view: ViewMode
   ctx: ContextMenu | null
   panX: number
   panY: number
+  scale: number
   dragId: string | null
   dropId: string | null
   newNodeId: string | null
@@ -55,6 +56,7 @@ export const initialState: AppState = {
   ctx: null,
   panX: 0,
   panY: 0,
+  scale: 1,
   dragId: null,
   dropId: null,
   newNodeId: null,
@@ -62,8 +64,10 @@ export const initialState: AppState = {
 
 export type Action =
   | { type: 'SELECT'; id: string | null }
-  | { type: 'MULTI_SELECT'; id: string }       // shift+click: toggle in selectedIds
+  | { type: 'MULTI_SELECT'; id: string }
+  | { type: 'BOX_SELECT'; ids: string[] }
   | { type: 'CLEAR_SELECTION' }
+  | { type: 'ZOOM'; scale: number; panX: number; panY: number }
   | { type: 'ADD_CHILD'; parentId: string }
   | { type: 'ADD_SIBLING'; nodeId: string }
   | { type: 'DELETE'; nodeId: string }
@@ -95,8 +99,16 @@ export function reducer(s: AppState, a: Action): AppState {
       return { ...s, selectedId, selectedIds, ctx: null }
     }
 
+    case 'BOX_SELECT': {
+      const selectedId = a.ids.length > 0 ? a.ids[a.ids.length - 1] : null
+      return { ...s, selectedIds: a.ids, selectedId, ctx: null }
+    }
+
     case 'CLEAR_SELECTION':
       return { ...s, selectedId: null, selectedIds: [], ctx: null }
+
+    case 'ZOOM':
+      return { ...s, scale: a.scale, panX: a.panX, panY: a.panY }
 
     case 'ADD_CHILD': {
       const id = gid()
