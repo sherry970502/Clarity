@@ -82,6 +82,7 @@ export type Action =
   | { type: 'SET_PAN'; dx: number; dy: number }
   | { type: 'DRAG_START'; nodeId: string }
   | { type: 'DRAG_OVER'; nodeId: string | null }
+  | { type: 'DRAG_END' }
   | { type: 'REPARENT'; nodeId: string; newParentId: string }
   | { type: 'CLEAR_NEW' }
 
@@ -241,10 +242,12 @@ export function reducer(s: AppState, a: Action): AppState {
 
     case 'DRAG_OVER': return { ...s, dropId: a.nodeId }
 
+    case 'DRAG_END': return { ...s, dragId: null, dropId: null }
+
     case 'REPARENT': {
       const { nodeId, newParentId } = a
       const n = s.nodes[nodeId]
-      if (!n || !n.parentId || nodeId === newParentId) return s
+      if (!n || !n.parentId || nodeId === newParentId || n.parentId === newParentId) return s
       const isDesc = (pid: string, cid: string): boolean => {
         const p = s.nodes[pid]
         if (!p) return false
