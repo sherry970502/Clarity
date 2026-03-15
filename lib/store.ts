@@ -45,6 +45,7 @@ export interface AppState {
   dragId: string | null
   dropId: string | null
   newNodeId: string | null
+  collapsedIds: string[]
 }
 
 export const initialState: AppState = {
@@ -60,6 +61,7 @@ export const initialState: AppState = {
   dragId: null,
   dropId: null,
   newNodeId: null,
+  collapsedIds: [],
 }
 
 export type Action =
@@ -85,6 +87,7 @@ export type Action =
   | { type: 'DRAG_END' }
   | { type: 'REPARENT'; nodeId: string; newParentId: string }
   | { type: 'CLEAR_NEW' }
+  | { type: 'TOGGLE_COLLAPSE'; nodeId: string }
 
 export function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
@@ -276,6 +279,11 @@ export function reducer(s: AppState, a: Action): AppState {
     }
 
     case 'CLEAR_NEW': return { ...s, newNodeId: null }
+
+    case 'TOGGLE_COLLAPSE': {
+      const already = s.collapsedIds.includes(a.nodeId)
+      return { ...s, collapsedIds: already ? s.collapsedIds.filter(id => id !== a.nodeId) : [...s.collapsedIds, a.nodeId] }
+    }
 
     default: return s
   }

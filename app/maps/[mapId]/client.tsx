@@ -43,6 +43,7 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
     dragId: null,
     dropId: null,
     newNodeId: null,
+    collapsedIds: [],
   }
 
   const [state, dispatch] = useReducer(reducer, initialAppState)

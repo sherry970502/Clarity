@@ -12,8 +12,8 @@ interface Props {
 interface DragBox { x: number; y: number; w: number; h: number }
 
 export function MindMap({ state, dispatch }: Props) {
-  const { nodes, rootId, selectedId, selectedIds, panX, panY, scale, dragId, dropId } = state
-  const positions = useMemo(() => calcLayout(nodes, rootId), [nodes, rootId])
+  const { nodes, rootId, selectedId, selectedIds, panX, panY, scale, dragId, dropId, collapsedIds } = state
+  const positions = useMemo(() => calcLayout(nodes, rootId, collapsedIds), [nodes, rootId, collapsedIds])
 
   const allPos = Object.values(positions)
   const minX = Math.min(...allPos.map(p => p.x), 0) - 120
@@ -189,6 +189,7 @@ export function MindMap({ state, dispatch }: Props) {
               isDragging={dragId === id}
               isDropTarget={dropId === id}
               isRoot={!n.parentId}
+              isCollapsed={collapsedIds.includes(id)}
               dragId={dragId}
               dispatch={dispatch}
             />
@@ -247,6 +248,7 @@ interface NodeCardProps {
   node: MindNode; x: number; y: number
   selected: boolean; multiSelected: boolean
   isDragging: boolean; isDropTarget: boolean; isRoot: boolean
+  isCollapsed: boolean
   dragId: string | null; dispatch: (a: Action) => void
 }
 
@@ -256,7 +258,7 @@ function cycleStatus(s?: Status): Status | undefined {
   return undefined
 }
 
-function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarget, isRoot, dragId, dispatch }: NodeCardProps) {
+function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarget, isRoot, isCollapsed, dragId, dispatch }: NodeCardProps) {
   const meta = NODE_TYPE_META[node.type]
   const isDimension = node.type === 'dimension'
   const isHighlighted = selected || multiSelected
@@ -323,6 +325,26 @@ function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarge
         )}
       </div>
       {isDropTarget && <div style={{ position: 'absolute', bottom: -3, left: 12, right: 12, height: 2, borderRadius: 1, background: '#4F46E5' }} />}
+      {node.children.length > 0 && (
+        <div
+          onClick={e => { e.stopPropagation(); dispatch({ type: 'TOGGLE_COLLAPSE', nodeId: node.id }) }}
+          title={isCollapsed ? `展开 ${node.children.length} 个子节点` : '折叠'}
+          style={{
+            position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)',
+            width: 18, height: 18, borderRadius: '50%',
+            background: isCollapsed ? meta.color : '#fff',
+            border: `1.5px solid ${meta.color}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 10, flexShrink: 0,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+            transition: 'background 0.15s, transform 0.15s',
+            fontSize: 9, fontWeight: 700, lineHeight: 1,
+            color: isCollapsed ? '#fff' : meta.color,
+          }}
+        >
+          {isCollapsed ? node.children.length : '−'}
+        </div>
+      )}
     </div>
   )
 }

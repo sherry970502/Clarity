@@ -19,8 +19,15 @@ function ShareMapView({ title, nodes, rootId }: { title: string; nodes: Record<s
     dragId: null,
     dropId: null,
     newNodeId: null,
+    collapsedIds: [],
   }
   const [state, dispatch] = useReducer(reducer, initialState)
+
+  const readOnlyDispatch: typeof dispatch = (action) => {
+    const blocked = ['UPDATE', 'UPDATE_MULTI', 'ADD_CHILD', 'ADD_SIBLING', 'DELETE', 'DELETE_MULTI', 'REPARENT', 'MOVE_UP', 'MOVE_DOWN']
+    if (blocked.includes(action.type)) return
+    dispatch(action)
+  }
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -59,7 +66,7 @@ function ShareMapView({ title, nodes, rootId }: { title: string; nodes: Record<s
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {state.view === 'mindmap' ? (
-          <MindMap state={state} dispatch={dispatch} />
+          <MindMap state={state} dispatch={readOnlyDispatch} />
         ) : (
           <TaskList
             nodes={state.nodes}
