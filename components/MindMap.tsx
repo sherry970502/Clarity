@@ -126,7 +126,7 @@ export function MindMap({ state, dispatch }: Props) {
   for (const [id, n] of Object.entries(nodes)) {
     const p = positions[id]
     if (!p) continue
-    for (const cid of n.children) {
+    for (const cid of [...new Set(n.children)]) {
       const cp = positions[cid]
       if (!cp) continue
       // Only draw edge if child's parentId points back to this node (guards against stale refs)
