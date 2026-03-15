@@ -29,7 +29,6 @@ export default async function MapPage({ params }: { params: Promise<{ mapId: str
       initialNodes={nodes}
       rootId={map.rootId}
       userName={session.user.name}
-      shareToken={map.shareToken ?? null}
     />
   )
 }

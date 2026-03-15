@@ -8,7 +8,6 @@ import { DetailPanel } from '@/components/DetailPanel'
 import { TaskList } from '@/components/TaskList'
 import { ContextMenu } from '@/components/ContextMenu'
 import { MindNode, NodeType, Priority } from '@/lib/types'
-import { ShareModal } from '@/components/ShareModal'
 
 interface Props {
   mapId: string
@@ -16,14 +15,11 @@ interface Props {
   initialNodes: Record<string, MindNode>
   rootId: string
   userName: string
-  shareToken: string | null
 }
 
-export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, shareToken: initialShareToken }: Props) {
+export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName }: Props) {
   const router = useRouter()
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
-  const [shareToken, setShareToken] = useState<string | null>(initialShareToken)
-  const [showShareModal, setShowShareModal] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstRender = useRef(true)
 
@@ -184,16 +180,6 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
           ))}
         </div>
 
-        <button
-          onClick={() => setShowShareModal(true)}
-          style={{
-            background: 'none', border: '1px solid #E2E8F0', borderRadius: 6,
-            cursor: 'pointer', color: '#4F46E5', fontSize: 11, padding: '4px 10px',
-            fontFamily: 'inherit', fontWeight: 500,
-          }}
-        >
-          {shareToken ? '分享中' : '分享'}
-        </button>
         <div style={{ width: 1, height: 18, background: '#E2E8F0' }} />
         <span style={{ fontSize: 12, color: '#94A3B8' }}>{userName}</span>
         <button
@@ -231,15 +217,6 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
           onClearNew={() => dispatch({ type: 'CLEAR_NEW' })}
         />
       </div>
-
-      {showShareModal && (
-        <ShareModal
-          mapId={mapId}
-          shareToken={shareToken}
-          onClose={() => setShowShareModal(false)}
-          onShareChange={setShareToken}
-        />
-      )}
 
       {state.ctx && (
         <ContextMenu

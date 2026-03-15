@@ -17,16 +17,14 @@ model User {
 }
 
 model MindMap {
-  id                String   @id @default(cuid())
-  userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title             String   @default("无标题")
-  nodesJson         String   @db.Text
-  rootId            String
-  updatedAt         DateTime @updatedAt
-  createdAt         DateTime @default(now())
-  shareToken        String?  @unique
-  sharePasswordHash String?
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String   @default("无标题")
+  nodesJson String   @db.Text
+  rootId    String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }
