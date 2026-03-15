@@ -254,16 +254,21 @@ export function reducer(s: AppState, a: Action): AppState {
         return p.children.includes(cid) || p.children.some(c => isDesc(c, cid))
       }
       if (isDesc(nodeId, newParentId)) return s
-      const oldParent = s.nodes[n.parentId]
       const newParent = s.nodes[newParentId]
-      if (!oldParent || !newParent) return s
+      if (!newParent) return s
+      // Remove nodeId from every node that has it as a child (defensive, handles any stale refs)
+      const cleaned: Record<string, MindNode> = {}
+      for (const [id, node] of Object.entries(s.nodes)) {
+        cleaned[id] = node.children.includes(nodeId)
+          ? { ...node, children: node.children.filter(c => c !== nodeId) }
+          : node
+      }
       return {
         ...s,
         nodes: {
-          ...s.nodes,
+          ...cleaned,
           [nodeId]: { ...n, parentId: newParentId },
-          [n.parentId]: { ...oldParent, children: oldParent.children.filter(c => c !== nodeId) },
-          [newParentId]: { ...newParent, children: [...newParent.children, nodeId] },
+          [newParentId]: { ...cleaned[newParentId], children: [...cleaned[newParentId].children, nodeId] },
         },
         dragId: null,
         dropId: null,

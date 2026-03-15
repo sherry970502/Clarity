@@ -129,6 +129,8 @@ export function MindMap({ state, dispatch }: Props) {
     for (const cid of n.children) {
       const cp = positions[cid]
       if (!cp) continue
+      // Only draw edge if child's parentId points back to this node (guards against stale refs)
+      if (nodes[cid]?.parentId !== id) continue
       const x1 = p.x - minX + NODE_W
       const y1 = p.y - minY + NODE_H / 2
       const x2 = cp.x - minX
