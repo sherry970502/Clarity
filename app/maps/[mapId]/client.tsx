@@ -241,6 +241,7 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
           selectedIds={state.selectedIds}
           onClose={() => dispatch({ type: 'CLEAR_SELECTION' })}
           onUpdate={patch => state.selectedId && dispatch({ type: 'UPDATE', nodeId: state.selectedId, patch })}
+          onUpdateStatus={status => state.selectedId && dispatch({ type: 'UPDATE', nodeId: state.selectedId, patch: { status } })}
           onUpdateMulti={patch => dispatch({ type: 'UPDATE_MULTI', ids: state.selectedIds, patch })}
           onDeleteMulti={() => dispatch({ type: 'DELETE_MULTI', ids: state.selectedIds })}
           onClearNew={() => dispatch({ type: 'CLEAR_NEW' })}

@@ -252,18 +252,11 @@ interface NodeCardProps {
   dragId: string | null; dispatch: (a: Action) => void
 }
 
-function cycleStatus(s?: Status): Status | undefined {
-  if (!s) return 'doing'
-  if (s === 'doing') return 'done'
-  return undefined
-}
-
 function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarget, isRoot, isCollapsed, dragId, dispatch }: NodeCardProps) {
   const meta = NODE_TYPE_META[node.type]
   const isDimension = node.type === 'dimension'
   const isHighlighted = selected || multiSelected
   const isDone = node.status === 'done'
-  const canHaveStatus = !isRoot && !isDimension
 
   const border = isDropTarget ? '2px solid #4F46E5'
     : isHighlighted ? `2px solid ${meta.color}`
@@ -305,22 +298,10 @@ function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarge
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingRight: 10, flexShrink: 0 }}>
         {multiSelected && <div style={{ width: 14, height: 14, borderRadius: '50%', background: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span></div>}
-        {node.description && !multiSelected && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#CBD5E1' }} title="有描述" />}
         {node.priority && !multiSelected && <div style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_META[node.priority].color }} />}
-        {canHaveStatus && !multiSelected && (
-          <div
-            onClick={e => { e.stopPropagation(); dispatch({ type: 'UPDATE', nodeId: node.id, patch: { status: cycleStatus(node.status) } }) }}
-            title={node.status ? STATUS_META[node.status].label : '标记状态'}
-            style={{
-              width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-              border: `1.5px solid ${node.status ? STATUS_META[node.status].color : '#D1D5DB'}`,
-              background: node.status === 'done' ? '#22C55E' : node.status === 'doing' ? '#FEF3C7' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
-          >
-            {node.status === 'done' && <span style={{ color: '#fff', fontSize: 8, lineHeight: 1, fontWeight: 700 }}>✓</span>}
-            {node.status === 'doing' && <span style={{ color: '#F59E0B', fontSize: 8, lineHeight: 1 }}>●</span>}
+        {isDone && !multiSelected && (
+          <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>
           </div>
         )}
       </div>

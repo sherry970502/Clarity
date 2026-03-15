@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { MindNode, NodeType, Priority, NODE_TYPE_META, PRIORITY_META } from '@/lib/types'
+import { MindNode, NodeType, Priority, Status, NODE_TYPE_META, PRIORITY_META } from '@/lib/types'
 
 interface Props {
   node: MindNode | null
@@ -8,12 +8,13 @@ interface Props {
   selectedIds: string[]
   onClose: () => void
   onUpdate: (patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'url'>>) => void
+  onUpdateStatus: (status?: Status) => void
   onUpdateMulti: (patch: Partial<Pick<MindNode, 'type' | 'priority'>>) => void
   onDeleteMulti: () => void
   onClearNew: () => void
 }
 
-export function DetailPanel({ node, isNew, selectedIds, onClose, onUpdate, onUpdateMulti, onDeleteMulti, onClearNew }: Props) {
+export function DetailPanel({ node, isNew, selectedIds, onClose, onUpdate, onUpdateStatus, onUpdateMulti, onDeleteMulti, onClearNew }: Props) {
   const titleRef = useRef<HTMLInputElement>(null)
   const descRef = useRef<HTMLTextAreaElement>(null)
 
@@ -226,6 +227,38 @@ export function DetailPanel({ node, isNew, selectedIds, onClose, onUpdate, onUpd
             </a>
           )}
         </div>
+
+        {/* Status */}
+        {node.type !== 'dimension' && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 11, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+              完成状态
+            </label>
+            <button
+              onClick={() => onUpdateStatus(node.status === 'done' ? undefined : 'done')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '9px 12px', borderRadius: 8,
+                border: `1.5px solid ${node.status === 'done' ? '#22C55E' : '#E2E8F0'}`,
+                background: node.status === 'done' ? '#F0FDF4' : '#fff',
+                color: node.status === 'done' ? '#16A34A' : '#64748B',
+                fontSize: 13, fontWeight: node.status === 'done' ? 600 : 400,
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{
+                width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                border: `1.5px solid ${node.status === 'done' ? '#22C55E' : '#D1D5DB'}`,
+                background: node.status === 'done' ? '#22C55E' : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {node.status === 'done' && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1, fontWeight: 700 }}>✓</span>}
+              </div>
+              {node.status === 'done' ? '已完成 · 点击取消' : '标记为已完成'}
+            </button>
+          </div>
+        )}
 
         {/* Priority */}
         <div>

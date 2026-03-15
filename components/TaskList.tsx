@@ -6,7 +6,7 @@ const LIST_TYPES: NodeType[] = ['goal', 'project', 'task', 'issue', 'pending']
 
 const PRIORITY_ORDER: (Priority | null)[] = ['high', 'medium', 'low', null]
 
-type FilterStatus = 'all' | 'todo' | 'doing' | 'done'
+type FilterStatus = 'all' | 'todo' | 'done'
 
 interface Props {
   nodes: Record<string, MindNode>
@@ -27,16 +27,13 @@ function findDimension(nodes: Record<string, MindNode>, id: string, rootId: stri
 }
 
 function cycleStatus(s?: Status): Status | undefined {
-  if (!s) return 'doing'
-  if (s === 'doing') return 'done'
-  return undefined
+  return s === 'done' ? undefined : 'done'
 }
 
 const FILTER_OPTIONS: { value: FilterStatus; label: string; color?: string }[] = [
-  { value: 'all',   label: '全部' },
-  { value: 'todo',  label: '未开始' },
-  { value: 'doing', label: '进行中', color: '#F59E0B' },
-  { value: 'done',  label: '已完成', color: '#22C55E' },
+  { value: 'all',  label: '全部' },
+  { value: 'todo', label: '未完成' },
+  { value: 'done', label: '已完成', color: '#22C55E' },
 ]
 
 export function TaskList({ nodes, rootId, onSelect, onUpdateStatus }: Props) {
@@ -52,9 +49,10 @@ export function TaskList({ nodes, rootId, onSelect, onUpdateStatus }: Props) {
 
   for (const t of LIST_TYPES) {
     byType[t].sort((a, b) => {
-      const ai = PRIORITY_ORDER.indexOf(a.priority)
-      const bi = PRIORITY_ORDER.indexOf(b.priority)
-      return ai - bi
+      const doneA = a.status === 'done' ? 1 : 0
+      const doneB = b.status === 'done' ? 1 : 0
+      if (doneA !== doneB) return doneA - doneB
+      return PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
     })
   }
 
@@ -134,17 +132,16 @@ export function TaskList({ nodes, rootId, onSelect, onUpdateStatus }: Props) {
                     {/* Status toggle button */}
                     <div
                       onClick={e => { e.stopPropagation(); onUpdateStatus(n.id, cycleStatus(n.status)) }}
-                      title={n.status ? STATUS_META[n.status].label : '标记状态'}
+                      title={n.status === 'done' ? STATUS_META.done.label : '标记状态'}
                       style={{
                         width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                        border: `1.5px solid ${n.status ? STATUS_META[n.status].color : '#D1D5DB'}`,
-                        background: n.status === 'done' ? '#22C55E' : n.status === 'doing' ? '#FEF3C7' : 'transparent',
+                        border: `1.5px solid ${n.status === 'done' ? STATUS_META.done.color : '#D1D5DB'}`,
+                        background: n.status === 'done' ? '#22C55E' : 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         cursor: 'pointer', transition: 'all 0.15s',
                       }}
                     >
                       {n.status === 'done' && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✓</span>}
-                      {n.status === 'doing' && <span style={{ color: '#F59E0B', fontSize: 9, lineHeight: 1 }}>●</span>}
                     </div>
 
                     {/* Left type bar */}
