@@ -1,27 +1,18 @@
 'use client'
-import { MindNode, NodeType, Priority, NODE_TYPE_META, PRIORITY_META } from '@/lib/types'
+import { useState } from 'react'
+import { MindNode, NodeType, Priority, Status, NODE_TYPE_META, PRIORITY_META, STATUS_META } from '@/lib/types'
 
 const LIST_TYPES: NodeType[] = ['goal', 'project', 'task', 'issue', 'pending']
 
 const PRIORITY_ORDER: (Priority | null)[] = ['high', 'medium', 'low', null]
 
+type FilterStatus = 'all' | 'todo' | 'doing' | 'done'
+
 interface Props {
   nodes: Record<string, MindNode>
   rootId: string
   onSelect: (id: string) => void
-}
-
-function getDimensionAncestor(nodes: Record<string, MindNode>, id: string): string | null {
-  let cur = nodes[id]?.parentId
-  while (cur) {
-    const n = nodes[cur]
-    if (!n) break
-    if (n.type === 'dimension' && cur !== /* skip root if root is dimension */ Object.values(nodes).find(x => !x.parentId)?.id) {
-      return n.title
-    }
-    cur = n.parentId
-  }
-  return null
+  onUpdateStatus: (id: string, status?: Status) => void
 }
 
 function findDimension(nodes: Record<string, MindNode>, id: string, rootId: string): string | null {
@@ -35,7 +26,22 @@ function findDimension(nodes: Record<string, MindNode>, id: string, rootId: stri
   return null
 }
 
-export function TaskList({ nodes, rootId, onSelect }: Props) {
+function cycleStatus(s?: Status): Status | undefined {
+  if (!s) return 'doing'
+  if (s === 'doing') return 'done'
+  return undefined
+}
+
+const FILTER_OPTIONS: { value: FilterStatus; label: string; color?: string }[] = [
+  { value: 'all',   label: '全部' },
+  { value: 'todo',  label: '未开始' },
+  { value: 'doing', label: '进行中', color: '#F59E0B' },
+  { value: 'done',  label: '已完成', color: '#22C55E' },
+]
+
+export function TaskList({ nodes, rootId, onSelect, onUpdateStatus }: Props) {
+  const [filter, setFilter] = useState<FilterStatus>('all')
+
   const byType: Record<string, MindNode[]> = {}
   for (const t of LIST_TYPES) byType[t] = []
 
@@ -52,15 +58,45 @@ export function TaskList({ nodes, rootId, onSelect }: Props) {
     })
   }
 
+  const matchesFilter = (n: MindNode) => {
+    if (filter === 'all') return true
+    if (filter === 'todo') return !n.status
+    return n.status === filter
+  }
+
   return (
     <div style={{
       flex: 1, overflowY: 'auto', padding: '32px 40px',
       background: '#F8FAFC', fontFamily: 'system-ui, sans-serif',
     }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
+
+        {/* Filter bar */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 28 }}>
+          {FILTER_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setFilter(opt.value)}
+              style={{
+                padding: '5px 14px', borderRadius: 20, border: 'none',
+                fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+                fontWeight: filter === opt.value ? 600 : 400,
+                background: filter === opt.value
+                  ? (opt.color ?? '#4F46E5')
+                  : '#E2E8F0',
+                color: filter === opt.value ? '#fff' : '#64748B',
+                transition: 'all 0.15s',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
         {LIST_TYPES.map(t => {
-          const items = byType[t]
+          const items = byType[t].filter(matchesFilter)
           const meta = NODE_TYPE_META[t]
+          if (items.length === 0) return null
           return (
             <div key={t} style={{ marginBottom: 36 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -77,12 +113,9 @@ export function TaskList({ nodes, rootId, onSelect }: Props) {
                 </span>
               </div>
 
-              {items.length === 0 && (
-                <div style={{ fontSize: 13, color: '#CBD5E1', padding: '8px 0 8px 12px' }}>暂无</div>
-              )}
-
               {items.map(n => {
                 const dim = findDimension(nodes, n.id, rootId)
+                const isDone = n.status === 'done'
                 return (
                   <div
                     key={n.id}
@@ -93,10 +126,27 @@ export function TaskList({ nodes, rootId, onSelect }: Props) {
                       background: '#fff', borderRadius: 8,
                       border: '1px solid #E2E8F0',
                       cursor: 'pointer', transition: 'box-shadow 0.15s',
+                      opacity: isDone ? 0.55 : 1,
                     }}
                     onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)')}
                     onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
                   >
+                    {/* Status toggle button */}
+                    <div
+                      onClick={e => { e.stopPropagation(); onUpdateStatus(n.id, cycleStatus(n.status)) }}
+                      title={n.status ? STATUS_META[n.status].label : '标记状态'}
+                      style={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        border: `1.5px solid ${n.status ? STATUS_META[n.status].color : '#D1D5DB'}`,
+                        background: n.status === 'done' ? '#22C55E' : n.status === 'doing' ? '#FEF3C7' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                      }}
+                    >
+                      {n.status === 'done' && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✓</span>}
+                      {n.status === 'doing' && <span style={{ color: '#F59E0B', fontSize: 9, lineHeight: 1 }}>●</span>}
+                    </div>
+
                     {/* Left type bar */}
                     <div style={{ width: 3, height: 32, borderRadius: 2, background: meta.color, flexShrink: 0 }} />
 
@@ -131,6 +181,12 @@ export function TaskList({ nodes, rootId, onSelect }: Props) {
             </div>
           )
         })}
+
+        {LIST_TYPES.every(t => byType[t].filter(matchesFilter).length === 0) && (
+          <div style={{ textAlign: 'center', color: '#CBD5E1', fontSize: 13, padding: '60px 0' }}>
+            暂无{filter !== 'all' ? FILTER_OPTIONS.find(o => o.value === filter)?.label + '的节点' : '节点'}
+          </div>
+        )}
       </div>
     </div>
   )

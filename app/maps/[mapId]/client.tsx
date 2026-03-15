@@ -202,6 +202,7 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName }: P
               dispatch({ type: 'SELECT', id })
               dispatch({ type: 'SET_VIEW', view: 'mindmap' })
             }}
+            onUpdateStatus={(id, status) => dispatch({ type: 'UPDATE', nodeId: id, patch: { status } })}
           />
         )}
 

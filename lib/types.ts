@@ -1,5 +1,6 @@
 export type NodeType = 'goal' | 'project' | 'issue' | 'task' | 'pending' | 'dimension'
 export type Priority = 'high' | 'medium' | 'low'
+export type Status = 'doing' | 'done'
 export type ViewMode = 'mindmap' | 'list'
 
 export interface MindNode {
@@ -8,8 +9,14 @@ export interface MindNode {
   description: string
   type: NodeType
   priority: Priority | null
+  status?: Status   // undefined = 未开始
   children: string[]
   parentId: string | null
+}
+
+export const STATUS_META: Record<Status, { label: string; color: string }> = {
+  doing: { label: '进行中', color: '#F59E0B' },
+  done:  { label: '已完成', color: '#22C55E' },
 }
 
 export const NODE_TYPE_META: Record<NodeType, { label: string; color: string; bg: string }> = {
