@@ -26,9 +26,9 @@ function estimateTitleWidth(title: string): number {
 
 export function getNodeH(node: MindNode | undefined, customTypes: NodeTypeDef[]): number {
   if (!node) return NODE_H
-  const typeDef = customTypes.find(t => t.id === node.type)
-  if (!typeDef?.wrapTitle) return NODE_H
-  // 只有标题实际会换行时才增高
+  // 根节点、维度类型保持原高度
+  if (node.type === 'dimension' || !node.parentId) return NODE_H
+  // 所有其他类型：标题超出一行才增高
   return estimateTitleWidth(node.title) > TITLE_AVAILABLE_W ? NODE_H_TALL : NODE_H
 }
 

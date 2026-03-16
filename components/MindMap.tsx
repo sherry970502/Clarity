@@ -376,7 +376,7 @@ function NodeCard({
   const typeDef = customTypes.find(t => t.id === node.type)
   const isEmpty = !node.type
   const isDimension = node.type === 'dimension' || isRoot
-  const isWrapTitle = !isDimension && !isEmpty && !!typeDef?.wrapTitle
+  const isWrapTitle = !isDimension
   const isHighlighted = selected || multiSelected
   const isDone = node.status === 'done'
 
