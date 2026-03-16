@@ -55,12 +55,17 @@ export default async function MapPage({
     if (missing.length > 0) customTypes = [...customTypes, ...missing]
   }
 
-  // Backfill wrapTitle from template knowledge for types saved before this field existed
+  // Sync color, bg, wrapTitle from template definitions for built-in types
   const allTemplateTypes = TEMPLATES.flatMap(t => t.types)
   customTypes = customTypes.map(ct => {
-    if (ct.wrapTitle !== undefined) return ct
     const tmpl = allTemplateTypes.find(tt => tt.id === ct.id)
-    return tmpl?.wrapTitle ? { ...ct, wrapTitle: true } : ct
+    if (!tmpl) return ct
+    return {
+      ...ct,
+      color: tmpl.color,
+      bg: tmpl.bg,
+      wrapTitle: tmpl.wrapTitle,
+    }
   })
 
   // Fetch the "from" map title for back navigation
