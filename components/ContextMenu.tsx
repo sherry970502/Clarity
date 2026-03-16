@@ -1,23 +1,24 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { NodeType, Priority, NODE_TYPE_META, PRIORITY_META } from '@/lib/types'
+import { NodeTypeDef, Priority, PRIORITY_META } from '@/lib/types'
 
 interface Props {
   x: number
   y: number
   nodeId: string
   isRoot: boolean
+  customTypes: NodeTypeDef[]
   onAddChild: () => void
   onAddSibling: () => void
   onDelete: () => void
-  onChangeType: (t: NodeType) => void
+  onChangeType: (t: string) => void
   onChangePriority: (p: Priority | null) => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   onClose: () => void
 }
 
-export function ContextMenu({ x, y, nodeId, isRoot, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onMoveUp, onMoveDown, onClose }: Props) {
+export function ContextMenu({ x, y, nodeId, isRoot, customTypes, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onMoveUp, onMoveDown, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -32,9 +33,9 @@ export function ContextMenu({ x, y, nodeId, isRoot, onAddChild, onAddSibling, on
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
   const menuW = 180
-  const menuH = 280
+  const estimatedH = 120 + customTypes.length * 32 + 80
   const cx = x + menuW > vw ? x - menuW : x
-  const cy = y + menuH > vh ? y - menuH : y
+  const cy = y + estimatedH > vh ? Math.max(0, y - estimatedH) : y
 
   const sep = <div style={{ height: 1, background: '#E2E8F0', margin: '4px 0' }} />
 
@@ -55,12 +56,12 @@ export function ContextMenu({ x, y, nodeId, isRoot, onAddChild, onAddSibling, on
       {!isRoot && <Item label="下移" onClick={() => { onMoveDown?.(); onClose() }} />}
       {sep}
       <div style={{ padding: '4px 12px 2px', fontSize: 10, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>切换类型</div>
-      {(Object.keys(NODE_TYPE_META) as NodeType[]).map(t => (
+      {customTypes.map(t => (
         <Item
-          key={t}
-          label={NODE_TYPE_META[t].label}
-          dot={NODE_TYPE_META[t].color}
-          onClick={() => { onChangeType(t); onClose() }}
+          key={t.id}
+          label={t.label}
+          dot={t.color}
+          onClick={() => { onChangeType(t.id); onClose() }}
         />
       ))}
       {sep}

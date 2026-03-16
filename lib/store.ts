@@ -1,4 +1,7 @@
-import { MindNode, NodeType, Priority, Status, ViewMode } from './types'
+import { MindNode, NodeType, NodeTypeDef, Priority, Status, ViewMode } from './types'
+import { TEMPLATES } from './templates'
+
+const DEFAULT_CUSTOM_TYPES: NodeTypeDef[] = TEMPLATES[0].types
 
 const gid = () => `n${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
@@ -46,6 +49,7 @@ export interface AppState {
   dropId: string | null
   newNodeId: string | null
   collapsedIds: string[]
+  customTypes: NodeTypeDef[]
 }
 
 export const initialState: AppState = {
@@ -62,6 +66,7 @@ export const initialState: AppState = {
   dropId: null,
   newNodeId: null,
   collapsedIds: [],
+  customTypes: DEFAULT_CUSTOM_TYPES,
 }
 
 export type Action =
@@ -74,7 +79,8 @@ export type Action =
   | { type: 'ADD_SIBLING'; nodeId: string }
   | { type: 'DELETE'; nodeId: string }
   | { type: 'DELETE_MULTI'; ids: string[] }
-  | { type: 'UPDATE'; nodeId: string; patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'status' | 'url'>> }
+  | { type: 'UPDATE'; nodeId: string; patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'status' | 'url' | 'mapLink'>> }
+  | { type: 'ADD_CUSTOM_TYPE'; typeDef: NodeTypeDef }
   | { type: 'UPDATE_MULTI'; ids: string[]; patch: Partial<Pick<MindNode, 'type' | 'priority'>> }
   | { type: 'MOVE_UP'; nodeId: string }
   | { type: 'MOVE_DOWN'; nodeId: string }
@@ -276,6 +282,12 @@ export function reducer(s: AppState, a: Action): AppState {
         dragId: null,
         dropId: null,
       }
+    }
+
+    case 'ADD_CUSTOM_TYPE': {
+      const already = s.customTypes.some(t => t.id === a.typeDef.id)
+      if (already) return s
+      return { ...s, customTypes: [...s.customTypes, a.typeDef] }
     }
 
     case 'CLEAR_NEW': return { ...s, newNodeId: null }

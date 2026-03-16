@@ -11,7 +11,7 @@ export async function POST(
 
   const map = await prisma.mindMap.findUnique({
     where: { shareToken },
-    select: { sharePasswordHash: true, title: true, nodesJson: true, rootId: true },
+    select: { sharePasswordHash: true, title: true, nodesJson: true, rootId: true, customTypesJson: true },
   })
 
   if (!map || !map.sharePasswordHash) {
@@ -27,5 +27,6 @@ export async function POST(
     title: map.title,
     nodesJson: map.nodesJson,
     rootId: map.rootId,
+    customTypesJson: map.customTypesJson,
   })
 }

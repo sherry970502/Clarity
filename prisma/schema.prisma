@@ -27,6 +27,7 @@ model MindMap {
   createdAt         DateTime @default(now())
   shareToken        String?  @unique
   sharePasswordHash String?
+  customTypesJson   String?  @db.Text
 
   @@index([userId])
 }

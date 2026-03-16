@@ -7,25 +7,34 @@ import { MindMap } from '@/components/MindMap'
 import { DetailPanel } from '@/components/DetailPanel'
 import { TaskList } from '@/components/TaskList'
 import { ContextMenu } from '@/components/ContextMenu'
-import { MindNode, NodeType, Priority } from '@/lib/types'
+import { MindNode, NodeTypeDef, Priority } from '@/lib/types'
 import { ShareModal } from '@/components/ShareModal'
 
 interface Props {
   mapId: string
   mapTitle: string
   initialNodes: Record<string, MindNode>
+  initialCustomTypes: NodeTypeDef[]
   rootId: string
   userName: string
   shareToken: string | null
+  allMaps: { id: string; title: string }[]
+  fromMapId: string | null
+  fromMapTitle: string | null
 }
 
-export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, shareToken: initialShareToken }: Props) {
+export function MapClient({
+  mapId, mapTitle, initialNodes, initialCustomTypes, rootId,
+  userName, shareToken: initialShareToken,
+  allMaps, fromMapId, fromMapTitle,
+}: Props) {
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken)
   const [showShareModal, setShowShareModal] = useState(false)
   const router = useRouter()
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstRender = useRef(true)
+  const isFirstCustomTypesRender = useRef(true)
 
   const [title, setTitle] = useState(mapTitle)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -44,6 +53,7 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
     dropId: null,
     newNodeId: null,
     collapsedIds: [],
+    customTypes: initialCustomTypes,
   }
 
   const [state, dispatch] = useReducer(reducer, initialAppState, (base) => {
@@ -80,6 +90,19 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.nodes, mapId])
 
+  // Auto-save customTypes when they change
+  useEffect(() => {
+    if (isFirstCustomTypesRender.current) {
+      isFirstCustomTypesRender.current = false
+      return
+    }
+    fetch(`/api/maps/${mapId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customTypesJson: JSON.stringify(state.customTypes) }),
+    })
+  }, [state.customTypes, mapId])
+
   // Save title
   async function saveTitle(newTitle: string) {
     setTitle(newTitle)
@@ -90,6 +113,11 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
       body: JSON.stringify({ title: newTitle }),
     })
   }
+
+  // Navigate to a linked map, passing current map as "from"
+  const handleNavigateToMap = useCallback((targetMapId: string) => {
+    router.push(`/maps/${targetMapId}?from=${mapId}`)
+  }, [router, mapId])
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -219,14 +247,40 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
         </button>
       </header>
 
+      {/* Back navigation bar (when navigated from another map) */}
+      {fromMapId && (
+        <div style={{
+          height: 32, background: '#EEF2FF', borderBottom: '1px solid #C7D2FE',
+          display: 'flex', alignItems: 'center', padding: '0 16px', gap: 8, flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 11, color: '#6366F1' }}>来自：</span>
+          <button
+            onClick={() => router.push(`/maps/${fromMapId}`)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 11, fontWeight: 600, color: '#4F46E5', fontFamily: 'inherit',
+              padding: 0,
+            }}
+          >
+            ← {fromMapTitle ?? '上一个图谱'}
+          </button>
+        </div>
+      )}
+
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {state.view === 'mindmap' ? (
-          <MindMap state={state} dispatch={dispatch} />
+          <MindMap
+            state={state}
+            dispatch={dispatch}
+            customTypes={state.customTypes}
+            onNavigateToMap={handleNavigateToMap}
+          />
         ) : (
           <TaskList
             nodes={state.nodes}
             rootId={state.rootId}
+            customTypes={state.customTypes}
             onSelect={id => {
               dispatch({ type: 'SELECT', id })
               dispatch({ type: 'SET_VIEW', view: 'mindmap' })
@@ -239,12 +293,17 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
           node={selNode}
           isNew={state.newNodeId === state.selectedId && state.newNodeId !== null}
           selectedIds={state.selectedIds}
+          customTypes={state.customTypes}
+          allMaps={allMaps}
+          currentMapId={mapId}
           onClose={() => dispatch({ type: 'CLEAR_SELECTION' })}
           onUpdate={patch => state.selectedId && dispatch({ type: 'UPDATE', nodeId: state.selectedId, patch })}
           onUpdateStatus={status => state.selectedId && dispatch({ type: 'UPDATE', nodeId: state.selectedId, patch: { status } })}
           onUpdateMulti={patch => dispatch({ type: 'UPDATE_MULTI', ids: state.selectedIds, patch })}
           onDeleteMulti={() => dispatch({ type: 'DELETE_MULTI', ids: state.selectedIds })}
           onClearNew={() => dispatch({ type: 'CLEAR_NEW' })}
+          onAddCustomType={typeDef => dispatch({ type: 'ADD_CUSTOM_TYPE', typeDef })}
+          onNavigateToMap={handleNavigateToMap}
         />
       </div>
 
@@ -263,10 +322,11 @@ export function MapClient({ mapId, mapTitle, initialNodes, rootId, userName, sha
           y={state.ctx.y}
           nodeId={state.ctx.nodeId}
           isRoot={state.ctx.nodeId === state.rootId}
+          customTypes={state.customTypes}
           onAddChild={() => { dispatch({ type: 'ADD_CHILD', parentId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onAddSibling={() => { dispatch({ type: 'ADD_SIBLING', nodeId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onDelete={() => { dispatch({ type: 'DELETE', nodeId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
-          onChangeType={(t: NodeType) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { type: t } }); dispatch({ type: 'CLOSE_CTX' }) }}
+          onChangeType={(t: string) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { type: t } }); dispatch({ type: 'CLOSE_CTX' }) }}
           onChangePriority={(p: Priority | null) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { priority: p } }); dispatch({ type: 'CLOSE_CTX' }) }}
           onMoveUp={() => dispatch({ type: 'MOVE_UP', nodeId: state.ctx!.nodeId })}
           onMoveDown={() => dispatch({ type: 'MOVE_DOWN', nodeId: state.ctx!.nodeId })}

@@ -1,17 +1,19 @@
 'use client'
 import { useRef, useCallback, useMemo, useState, useEffect } from 'react'
-import { MindNode, NODE_TYPE_META, PRIORITY_META, STATUS_META, Status } from '@/lib/types'
+import { MindNode, NodeTypeDef, getTypeMeta, PRIORITY_META } from '@/lib/types'
 import { calcLayout, NODE_W, NODE_H } from '@/lib/layout'
 import { AppState, Action } from '@/lib/store'
 
 interface Props {
   state: AppState
   dispatch: (a: Action) => void
+  customTypes: NodeTypeDef[]
+  onNavigateToMap: (mapId: string) => void
 }
 
 interface DragBox { x: number; y: number; w: number; h: number }
 
-export function MindMap({ state, dispatch }: Props) {
+export function MindMap({ state, dispatch, customTypes, onNavigateToMap }: Props) {
   const { nodes, rootId, selectedId, selectedIds, panX, panY, scale, dragId, dropId, collapsedIds } = state
   const positions = useMemo(() => calcLayout(nodes, rootId, collapsedIds), [nodes, rootId, collapsedIds])
 
@@ -33,7 +35,6 @@ export function MindMap({ state, dispatch }: Props) {
   const [dragBox, setDragBox] = useState<DragBox | null>(null)
   const [altDown, setAltDown] = useState(false)
 
-  // Track Alt key for cursor hint
   useEffect(() => {
     const down = (e: KeyboardEvent) => { if (e.key === 'Alt') setAltDown(true) }
     const up = (e: KeyboardEvent) => { if (e.key === 'Alt') setAltDown(false) }
@@ -43,7 +44,7 @@ export function MindMap({ state, dispatch }: Props) {
   }, [])
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 1) { // Middle click always pans
+    if (e.button === 1) {
       interactRef.current = { mode: 'pan', startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY }
       e.preventDefault(); return
     }
@@ -57,12 +58,10 @@ export function MindMap({ state, dispatch }: Props) {
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     const ref = interactRef.current
     if (ref.mode === 'none') return
-
     if (ref.mode === 'pan') {
       dispatch({ type: 'SET_PAN', dx: e.clientX - ref.lastX, dy: e.clientY - ref.lastY })
       ref.lastX = e.clientX; ref.lastY = e.clientY
     } else {
-      // Box select
       const x = Math.min(ref.startX, e.clientX)
       const y = Math.min(ref.startY, e.clientY)
       const w = Math.abs(e.clientX - ref.startX)
@@ -75,7 +74,6 @@ export function MindMap({ state, dispatch }: Props) {
     const ref = interactRef.current
     if (ref.mode === 'box' && dragBox && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
-      // Convert viewport box → canvas coords (accounting for pan and scale)
       const bx1 = (dragBox.x - rect.left - panX) / scale
       const by1 = (dragBox.y - rect.top - panY) / scale
       const bx2 = bx1 + dragBox.w / scale
@@ -96,7 +94,6 @@ export function MindMap({ state, dispatch }: Props) {
         dispatch({ type: 'CLOSE_CTX' })
       }
     } else if (ref.mode === 'box' && !dragBox) {
-      // Click on background without drag → clear selection
       dispatch({ type: 'CLEAR_SELECTION' })
       dispatch({ type: 'CLOSE_CTX' })
     }
@@ -104,7 +101,6 @@ export function MindMap({ state, dispatch }: Props) {
     setDragBox(null)
   }, [dragBox, panX, panY, scale, positions, minX, minY, dispatch])
 
-  // Zoom with Ctrl+scroll, pan with scroll
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
     if (e.ctrlKey || e.metaKey) {
@@ -121,7 +117,7 @@ export function MindMap({ state, dispatch }: Props) {
     }
   }, [scale, panX, panY, dispatch])
 
-  // Build edges
+  // Build edges using dynamic type colors
   const edges: React.ReactNode[] = []
   for (const [id, n] of Object.entries(nodes)) {
     const p = positions[id]
@@ -129,19 +125,20 @@ export function MindMap({ state, dispatch }: Props) {
     for (const cid of [...new Set(n.children)]) {
       const cp = positions[cid]
       if (!cp) continue
-      // Only draw edge if child's parentId points back to this node (guards against stale refs)
       if (nodes[cid]?.parentId !== id) continue
       const x1 = p.x - minX + NODE_W
       const y1 = p.y - minY + NODE_H / 2
       const x2 = cp.x - minX
       const y2 = cp.y - minY + NODE_H / 2
       const mx = (x1 + x2) / 2
-      const childType = nodes[cid]?.type
+      const childType = nodes[cid]?.type ?? 'task'
       const isSelected = selectedIds.includes(cid)
+      const meta = getTypeMeta(childType, customTypes)
+      const isDimension = childType === 'dimension'
       const color = isSelected
-        ? NODE_TYPE_META[childType ?? 'task'].color
-        : childType === 'dimension' ? '#94A3B8'
-        : NODE_TYPE_META[childType ?? 'task'].color + '55'
+        ? meta.color
+        : isDimension ? '#94A3B8'
+        : meta.color + '55'
       edges.push(
         <path key={`${id}-${cid}`}
           d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
@@ -191,6 +188,8 @@ export function MindMap({ state, dispatch }: Props) {
               isRoot={!n.parentId}
               isCollapsed={collapsedIds.includes(id)}
               dragId={dragId}
+              customTypes={customTypes}
+              onNavigateToMap={onNavigateToMap}
               dispatch={dispatch}
             />
           )
@@ -249,12 +248,19 @@ interface NodeCardProps {
   selected: boolean; multiSelected: boolean
   isDragging: boolean; isDropTarget: boolean; isRoot: boolean
   isCollapsed: boolean
-  dragId: string | null; dispatch: (a: Action) => void
+  dragId: string | null
+  customTypes: NodeTypeDef[]
+  onNavigateToMap: (mapId: string) => void
+  dispatch: (a: Action) => void
 }
 
-function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarget, isRoot, isCollapsed, dragId, dispatch }: NodeCardProps) {
-  const meta = NODE_TYPE_META[node.type]
-  const isDimension = node.type === 'dimension'
+function NodeCard({
+  node, x, y, selected, multiSelected, isDragging, isDropTarget, isRoot,
+  isCollapsed, dragId, customTypes, onNavigateToMap, dispatch,
+}: NodeCardProps) {
+  const meta = getTypeMeta(node.type, customTypes)
+  // dimension type OR root node gets the "dimension" visual treatment
+  const isDimension = node.type === 'dimension' || isRoot
   const isHighlighted = selected || multiSelected
   const isDone = node.status === 'done'
 
@@ -290,13 +296,17 @@ function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarge
     >
       <div style={{ width: isDimension ? 5 : 4, alignSelf: 'stretch', borderRadius: isDimension ? '10px 0 0 10px' : '8px 0 0 8px', background: meta.color, flexShrink: 0 }} />
       <div style={{ flex: 1, padding: '0 8px', minWidth: 0 }}>
-        {isDimension && <div style={{ fontSize: 9, color: meta.color, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>{meta.label}</div>}
+        {isDimension && node.type === 'dimension' && (
+          <div style={{ fontSize: 9, color: meta.color, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>{meta.label}</div>
+        )}
         <div style={{ fontSize: 13, fontWeight: isDimension ? 600 : 500, color: isDimension ? '#1E293B' : '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: isDimension ? '1.2' : '1.4' }}>
           {node.title}
         </div>
         {!isDimension && <div style={{ fontSize: 10, color: meta.color, opacity: 0.7, letterSpacing: '0.03em', marginTop: 1 }}>{meta.label}</div>}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingRight: 10, flexShrink: 0 }}>
+
+      {/* Right-side indicators */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingRight: node.children.length > 0 ? 16 : 10, flexShrink: 0 }}>
         {multiSelected && <div style={{ width: 14, height: 14, borderRadius: '50%', background: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span></div>}
         {node.priority && !multiSelected && <div style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_META[node.priority].color }} />}
         {isDone && !multiSelected && (
@@ -305,7 +315,27 @@ function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarge
           </div>
         )}
       </div>
+
+      {/* mapLink icon — top-right corner, small and subtle */}
+      {node.mapLink && !multiSelected && (
+        <div
+          title="跳转到关联图谱"
+          onClick={e => { e.stopPropagation(); onNavigateToMap(node.mapLink!) }}
+          style={{
+            position: 'absolute', top: -1, right: node.children.length > 0 ? 10 : 2,
+            width: 14, height: 14, borderRadius: 3,
+            background: '#4F46E5', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', zIndex: 11, flexShrink: 0,
+            boxShadow: '0 1px 3px rgba(79,70,229,0.3)',
+          }}
+        >
+          <span style={{ color: '#fff', fontSize: 8, lineHeight: 1, fontWeight: 700 }}>↗</span>
+        </div>
+      )}
+
       {isDropTarget && <div style={{ position: 'absolute', bottom: -3, left: 12, right: 12, height: 2, borderRadius: 1, background: '#4F46E5' }} />}
+
+      {/* Collapse toggle */}
       {node.children.length > 0 && (
         <div
           onClick={e => { e.stopPropagation(); dispatch({ type: 'TOGGLE_COLLAPSE', nodeId: node.id }) }}
@@ -318,7 +348,7 @@ function NodeCard({ node, x, y, selected, multiSelected, isDragging, isDropTarge
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', zIndex: 10, flexShrink: 0,
             boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-            transition: 'background 0.15s, transform 0.15s',
+            transition: 'background 0.15s',
             fontSize: 9, fontWeight: 700, lineHeight: 1,
             color: isCollapsed ? '#fff' : meta.color,
           }}

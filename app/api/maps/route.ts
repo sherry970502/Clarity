@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { INITIAL_NODES } from '@/lib/store'
+import { getTemplate, TEMPLATES } from '@/lib/templates'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -21,14 +21,16 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { title } = await req.json().catch(() => ({}))
+  const { title, templateId } = await req.json().catch(() => ({}))
   const rootId = 'root'
+
+  const template = getTemplate(templateId) ?? TEMPLATES[0]
 
   const rootNode = {
     id: rootId,
     title: title || '新战略图',
     description: '',
-    type: 'dimension',
+    type: template.rootType,
     priority: null,
     children: [],
     parentId: null,
@@ -40,6 +42,7 @@ export async function POST(req: NextRequest) {
       title: title || '新战略图',
       nodesJson: JSON.stringify({ [rootId]: rootNode }),
       rootId,
+      customTypesJson: JSON.stringify(template.types),
     },
   })
 

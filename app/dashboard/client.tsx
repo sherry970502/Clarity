@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import { TEMPLATES } from '@/lib/templates'
 
 interface MapItem {
   id: string
@@ -20,6 +21,7 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
   const [maps, setMaps] = useState(initialMaps)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id)
   const [showCreate, setShowCreate] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
 
@@ -29,12 +31,13 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
     const res = await fetch('/api/maps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTitle || '新战略图' }),
+      body: JSON.stringify({ title: newTitle || '新战略图', templateId: selectedTemplate }),
     })
     const map = await res.json()
     setCreating(false)
     setShowCreate(false)
     setNewTitle('')
+    setSelectedTemplate(TEMPLATES[0].id)
     router.push(`/maps/${map.id}`)
   }
 
@@ -103,7 +106,42 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
             padding: '20px', marginBottom: 20,
             boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
           }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B', marginBottom: 10 }}>新建战略图</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B', marginBottom: 14 }}>新建战略图</div>
+
+            {/* Template selection */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 8 }}>选择模板</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                {TEMPLATES.map(tpl => (
+                  <div
+                    key={tpl.id}
+                    onClick={() => setSelectedTemplate(tpl.id)}
+                    style={{
+                      flex: 1, padding: '12px 14px', borderRadius: 8, cursor: 'pointer',
+                      border: `2px solid ${selectedTemplate === tpl.id ? '#4F46E5' : '#E2E8F0'}`,
+                      background: selectedTemplate === tpl.id ? '#EEF2FF' : '#FAFAFA',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600, color: selectedTemplate === tpl.id ? '#4F46E5' : '#1E293B', marginBottom: 3 }}>
+                      {tpl.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#94A3B8', lineHeight: 1.4 }}>{tpl.description}</div>
+                    {/* Type preview */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                      {tpl.types.filter(t => t.id !== 'dimension').slice(0, 5).map(t => (
+                        <span key={t.id} style={{
+                          fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                          background: t.bg, color: t.color, border: `1px solid ${t.color}33`,
+                        }}>{t.label}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Title input */}
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 autoFocus

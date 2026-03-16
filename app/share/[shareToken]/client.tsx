@@ -3,9 +3,10 @@ import { useState, useReducer } from 'react'
 import { reducer, AppState } from '@/lib/store'
 import { MindMap } from '@/components/MindMap'
 import { TaskList } from '@/components/TaskList'
-import { MindNode } from '@/lib/types'
+import { MindNode, NodeTypeDef } from '@/lib/types'
+import { TEMPLATES } from '@/lib/templates'
 
-function ShareMapView({ title, nodes, rootId }: { title: string; nodes: Record<string, MindNode>; rootId: string }) {
+function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; nodes: Record<string, MindNode>; rootId: string; customTypes: NodeTypeDef[] }) {
   const initialState: AppState = {
     nodes,
     rootId,
@@ -20,6 +21,7 @@ function ShareMapView({ title, nodes, rootId }: { title: string; nodes: Record<s
     dropId: null,
     newNodeId: null,
     collapsedIds: [],
+    customTypes,
   }
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -66,11 +68,12 @@ function ShareMapView({ title, nodes, rootId }: { title: string; nodes: Record<s
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {state.view === 'mindmap' ? (
-          <MindMap state={state} dispatch={readOnlyDispatch} />
+          <MindMap state={state} dispatch={readOnlyDispatch} customTypes={customTypes} onNavigateToMap={() => {}} />
         ) : (
           <TaskList
             nodes={state.nodes}
             rootId={state.rootId}
+            customTypes={customTypes}
             onSelect={() => {}}
             onUpdateStatus={() => {}}
           />
@@ -84,7 +87,7 @@ export function ShareViewer({ shareToken }: { shareToken: string }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [mapData, setMapData] = useState<{ title: string; nodes: Record<string, MindNode>; rootId: string } | null>(null)
+  const [mapData, setMapData] = useState<{ title: string; nodes: Record<string, MindNode>; rootId: string; customTypes: NodeTypeDef[] } | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -100,10 +103,13 @@ export function ShareViewer({ shareToken }: { shareToken: string }) {
       if (!res.ok) {
         setError(data.error ?? '请求失败')
       } else {
+        let customTypes: NodeTypeDef[] = TEMPLATES[0].types
+        try { if (data.customTypesJson) customTypes = JSON.parse(data.customTypesJson) } catch {}
         setMapData({
           title: data.title,
           nodes: JSON.parse(data.nodesJson),
           rootId: data.rootId,
+          customTypes,
         })
       }
     } catch {
@@ -114,7 +120,7 @@ export function ShareViewer({ shareToken }: { shareToken: string }) {
   }
 
   if (mapData) {
-    return <ShareMapView title={mapData.title} nodes={mapData.nodes} rootId={mapData.rootId} />
+    return <ShareMapView title={mapData.title} nodes={mapData.nodes} rootId={mapData.rootId} customTypes={mapData.customTypes} />
   }
 
   return (
