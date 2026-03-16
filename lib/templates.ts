@@ -37,7 +37,7 @@ export const TEMPLATES: Template[] = [
       { id: 'monthly',    label: '月度计划',   color: '#059669', bg: '#ECFDF5' },
       { id: 'affair',     label: '事务',       color: '#64748B', bg: '#F8FAFC', wrapTitle: true },
       { id: 'creative',   label: '创意',       color: '#0284C7', bg: '#F0F9FF', wrapTitle: true },
-      { id: 'subproject', label: '子项目',     color: '#DB2777', bg: '#FDF2F8' },
+      { id: 'subproject', label: '子项目',     color: '#CA8A04', bg: '#FEFCE8' },
       { id: 'dimension',  label: '维度',       color: '#1E293B', bg: '#F1F5F9' },
     ],
   },
