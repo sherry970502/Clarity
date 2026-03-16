@@ -5,8 +5,10 @@ import { MindMap } from '@/components/MindMap'
 import { TaskList } from '@/components/TaskList'
 import { MindNode, NodeTypeDef } from '@/lib/types'
 import { TEMPLATES } from '@/lib/templates'
+import { NodeFocusModal } from '@/components/NodeFocusModal'
 
 function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; nodes: Record<string, MindNode>; rootId: string; customTypes: NodeTypeDef[] }) {
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const initialState: AppState = {
     nodes,
     rootId,
@@ -68,7 +70,7 @@ function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; no
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {state.view === 'mindmap' ? (
-          <MindMap state={state} dispatch={readOnlyDispatch} customTypes={customTypes} onNavigateToMap={() => {}} />
+          <MindMap state={state} dispatch={readOnlyDispatch} customTypes={customTypes} onNavigateToMap={() => {}} onFocusNode={setFocusedNodeId} />
         ) : (
           <TaskList
             nodes={state.nodes}
@@ -79,6 +81,16 @@ function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; no
           />
         )}
       </div>
+
+      {focusedNodeId && state.nodes[focusedNodeId] && (
+        <NodeFocusModal
+          node={state.nodes[focusedNodeId]}
+          customTypes={customTypes}
+          allMaps={[]}
+          onClose={() => setFocusedNodeId(null)}
+          onNavigateToMap={() => {}}
+        />
+      )}
     </div>
   )
 }

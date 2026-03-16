@@ -8,6 +8,7 @@ export interface NodeTypeDef {
   label: string
   color: string
   bg: string
+  wrapTitle?: boolean  // 不截断标题，允许换行显示
 }
 
 export interface MindNode {
@@ -43,11 +44,13 @@ export const PRIORITY_META: Record<Priority, { label: string; color: string }> =
   low:    { label: '低', color: '#22C55E' },
 }
 
-const DEFAULT_TYPE_DEF: NodeTypeDef = { id: 'task', label: '任务', color: '#059669', bg: '#ECFDF5' }
+// 空类型：新建节点未分配标签时使用
+export const EMPTY_TYPE_DEF: NodeTypeDef = { id: '', label: '', color: '#CBD5E1', bg: '#F8FAFC' }
 
 export function getTypeMeta(type: string, customTypes: NodeTypeDef[]): NodeTypeDef {
+  if (!type) return EMPTY_TYPE_DEF
   const custom = customTypes.find(t => t.id === type)
   if (custom) return custom
   if (NODE_TYPE_META[type]) return { id: type, ...NODE_TYPE_META[type] }
-  return DEFAULT_TYPE_DEF
+  return EMPTY_TYPE_DEF
 }

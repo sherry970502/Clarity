@@ -9,6 +9,7 @@ import { TaskList } from '@/components/TaskList'
 import { ContextMenu } from '@/components/ContextMenu'
 import { MindNode, NodeTypeDef, Priority } from '@/lib/types'
 import { ShareModal } from '@/components/ShareModal'
+import { NodeFocusModal } from '@/components/NodeFocusModal'
 
 interface Props {
   mapId: string
@@ -29,6 +30,7 @@ export function MapClient({
   allMaps, fromMapId, fromMapTitle,
 }: Props) {
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken)
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
   const router = useRouter()
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
@@ -275,6 +277,7 @@ export function MapClient({
             dispatch={dispatch}
             customTypes={state.customTypes}
             onNavigateToMap={handleNavigateToMap}
+            onFocusNode={setFocusedNodeId}
           />
         ) : (
           <TaskList
@@ -313,6 +316,16 @@ export function MapClient({
           shareToken={shareToken}
           onClose={() => setShowShareModal(false)}
           onShareChange={setShareToken}
+        />
+      )}
+
+      {focusedNodeId && state.nodes[focusedNodeId] && (
+        <NodeFocusModal
+          node={state.nodes[focusedNodeId]}
+          customTypes={state.customTypes}
+          allMaps={allMaps}
+          onClose={() => setFocusedNodeId(null)}
+          onNavigateToMap={handleNavigateToMap}
         />
       )}
 

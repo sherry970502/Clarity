@@ -42,6 +42,27 @@ export default async function MapPage({
     customTypes = TEMPLATES[0].types
   }
 
+  // Infer which template this map belongs to by matching type ID overlap
+  const bestTemplate = TEMPLATES.map(tpl => ({
+    tpl,
+    score: tpl.types.filter(tt => customTypes.some(ct => ct.id === tt.id)).length,
+  })).sort((a, b) => b.score - a.score)[0]?.tpl
+
+  // Append types that exist in the template but are missing from the map
+  if (bestTemplate) {
+    const existingIds = new Set(customTypes.map(ct => ct.id))
+    const missing = bestTemplate.types.filter(tt => !existingIds.has(tt.id))
+    if (missing.length > 0) customTypes = [...customTypes, ...missing]
+  }
+
+  // Backfill wrapTitle from template knowledge for types saved before this field existed
+  const allTemplateTypes = TEMPLATES.flatMap(t => t.types)
+  customTypes = customTypes.map(ct => {
+    if (ct.wrapTitle !== undefined) return ct
+    const tmpl = allTemplateTypes.find(tt => tt.id === ct.id)
+    return tmpl?.wrapTitle ? { ...ct, wrapTitle: true } : ct
+  })
+
   // Fetch the "from" map title for back navigation
   let fromMapTitle: string | null = null
   if (fromMapId) {

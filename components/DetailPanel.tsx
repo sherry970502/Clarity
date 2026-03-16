@@ -286,7 +286,7 @@ export function DetailPanel({
         </div>
 
         {/* Status */}
-        {node.type !== 'dimension' && (
+        {node.type !== 'dimension' && node.type !== '' && (
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>完成状态</label>
             <button

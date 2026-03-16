@@ -128,7 +128,7 @@ export function reducer(s: AppState, a: Action): AppState {
         ...s,
         nodes: {
           ...s.nodes,
-          [id]: node(id, '新节点', 'task', a.parentId),
+          [id]: node(id, '新节点', '', a.parentId),
           [a.parentId]: { ...parent, children: [...parent.children, id] },
         },
         selectedId: id,
@@ -150,7 +150,7 @@ export function reducer(s: AppState, a: Action): AppState {
         ...s,
         nodes: {
           ...s.nodes,
-          [id]: node(id, '新节点', n.type, n.parentId),
+          [id]: node(id, '新节点', '', n.parentId),
           [n.parentId]: { ...parent, children },
         },
         selectedId: id,
