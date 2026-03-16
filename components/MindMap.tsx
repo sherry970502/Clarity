@@ -296,11 +296,6 @@ interface HoverPreviewProps {
 
 function HoverPreview({ node, info, customTypes }: HoverPreviewProps) {
   const meta = getTypeMeta(node.type, customTypes)
-  const typeDef = customTypes.find(t => t.id === node.type)
-  const hasContent = !!node.description || (!node.type ? false : typeDef?.wrapTitle)
-
-  if (!hasContent) return null
-
   const cardW = 300
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
   // Appear to the right of the node, flip left if not enough space
