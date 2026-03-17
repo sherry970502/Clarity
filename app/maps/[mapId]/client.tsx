@@ -32,6 +32,7 @@ export function MapClient({
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [starView, setStarView] = useState(false)
   const router = useRouter()
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -211,20 +212,34 @@ export function MapClient({
           {(['mindmap', 'list'] as const).map(v => (
             <button
               key={v}
-              onClick={() => dispatch({ type: 'SET_VIEW', view: v })}
+              onClick={() => { dispatch({ type: 'SET_VIEW', view: v }); setStarView(false) }}
               style={{
                 padding: '4px 12px', borderRadius: 6, border: 'none',
                 fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
-                fontWeight: state.view === v ? 600 : 400,
-                background: state.view === v ? '#fff' : 'transparent',
-                color: state.view === v ? '#1E293B' : '#64748B',
-                boxShadow: state.view === v ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                fontWeight: state.view === v && !starView ? 600 : 400,
+                background: state.view === v && !starView ? '#fff' : 'transparent',
+                color: state.view === v && !starView ? '#1E293B' : '#64748B',
+                boxShadow: state.view === v && !starView ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.15s',
               }}
             >
               {v === 'mindmap' ? '思维导图' : '任务列表'}
             </button>
           ))}
+          <button
+            onClick={() => { setStarView(v => !v); dispatch({ type: 'SET_VIEW', view: 'mindmap' }) }}
+            style={{
+              padding: '4px 10px', borderRadius: 6, border: 'none',
+              fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+              fontWeight: starView ? 600 : 400,
+              background: starView ? '#FFFBEB' : 'transparent',
+              color: starView ? '#D97706' : '#94A3B8',
+              boxShadow: starView ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            ☆ 星标
+          </button>
         </div>
 
         <button
@@ -276,6 +291,7 @@ export function MapClient({
             state={state}
             dispatch={dispatch}
             customTypes={state.customTypes}
+            starView={starView}
             onNavigateToMap={handleNavigateToMap}
             onFocusNode={setFocusedNodeId}
           />
@@ -335,12 +351,14 @@ export function MapClient({
           y={state.ctx.y}
           nodeId={state.ctx.nodeId}
           isRoot={state.ctx.nodeId === state.rootId}
+          isStarred={!!state.nodes[state.ctx.nodeId]?.starred}
           customTypes={state.customTypes}
           onAddChild={() => { dispatch({ type: 'ADD_CHILD', parentId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onAddSibling={() => { dispatch({ type: 'ADD_SIBLING', nodeId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onDelete={() => { dispatch({ type: 'DELETE', nodeId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onChangeType={(t: string) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { type: t } }); dispatch({ type: 'CLOSE_CTX' }) }}
           onChangePriority={(p: Priority | null) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { priority: p } }); dispatch({ type: 'CLOSE_CTX' }) }}
+          onToggleStar={() => dispatch({ type: 'TOGGLE_STAR', nodeId: state.ctx!.nodeId })}
           onMoveUp={() => dispatch({ type: 'MOVE_UP', nodeId: state.ctx!.nodeId })}
           onMoveDown={() => dispatch({ type: 'MOVE_DOWN', nodeId: state.ctx!.nodeId })}
           onClose={() => dispatch({ type: 'CLOSE_CTX' })}

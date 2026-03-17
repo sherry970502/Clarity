@@ -70,7 +70,7 @@ function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; no
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {state.view === 'mindmap' ? (
-          <MindMap state={state} dispatch={readOnlyDispatch} customTypes={customTypes} onNavigateToMap={() => {}} onFocusNode={setFocusedNodeId} />
+          <MindMap state={state} dispatch={readOnlyDispatch} customTypes={customTypes} starView={false} onNavigateToMap={() => {}} onFocusNode={setFocusedNodeId} />
         ) : (
           <TaskList
             nodes={state.nodes}

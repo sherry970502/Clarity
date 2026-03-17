@@ -20,6 +20,7 @@ export interface MindNode {
   status?: Status   // undefined = 未开始
   url?: string
   mapLink?: string  // 关联的另一张思维导图 ID
+  starred?: boolean // 星标节点
   children: string[]
   parentId: string | null
 }

@@ -7,18 +7,20 @@ interface Props {
   y: number
   nodeId: string
   isRoot: boolean
+  isStarred: boolean
   customTypes: NodeTypeDef[]
   onAddChild: () => void
   onAddSibling: () => void
   onDelete: () => void
   onChangeType: (t: string) => void
   onChangePriority: (p: Priority | null) => void
+  onToggleStar: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   onClose: () => void
 }
 
-export function ContextMenu({ x, y, nodeId, isRoot, customTypes, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onMoveUp, onMoveDown, onClose }: Props) {
+export function ContextMenu({ x, y, nodeId, isRoot, isStarred, customTypes, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onToggleStar, onMoveUp, onMoveDown, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -75,6 +77,8 @@ export function ContextMenu({ x, y, nodeId, isRoot, customTypes, onAddChild, onA
           onClick={() => { onChangePriority(p); onClose() }}
         />
       ))}
+      {sep}
+      <Item label={isStarred ? '取消星标' : '加星标'} onClick={() => { onToggleStar(); onClose() }} />
       {!isRoot && (
         <>
           {sep}

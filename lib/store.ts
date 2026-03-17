@@ -94,6 +94,7 @@ export type Action =
   | { type: 'REPARENT'; nodeId: string; newParentId: string }
   | { type: 'CLEAR_NEW' }
   | { type: 'TOGGLE_COLLAPSE'; nodeId: string }
+  | { type: 'TOGGLE_STAR'; nodeId: string }
 
 export function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
@@ -295,6 +296,12 @@ export function reducer(s: AppState, a: Action): AppState {
     case 'TOGGLE_COLLAPSE': {
       const already = s.collapsedIds.includes(a.nodeId)
       return { ...s, collapsedIds: already ? s.collapsedIds.filter(id => id !== a.nodeId) : [...s.collapsedIds, a.nodeId] }
+    }
+
+    case 'TOGGLE_STAR': {
+      const n = s.nodes[a.nodeId]
+      if (!n) return s
+      return { ...s, nodes: { ...s.nodes, [a.nodeId]: { ...n, starred: !n.starred } } }
     }
 
     default: return s

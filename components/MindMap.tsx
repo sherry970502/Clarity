@@ -8,6 +8,7 @@ interface Props {
   state: AppState
   dispatch: (a: Action) => void
   customTypes: NodeTypeDef[]
+  starView: boolean
   onNavigateToMap: (mapId: string) => void
   onFocusNode: (nodeId: string) => void
 }
@@ -20,12 +21,32 @@ interface HoverInfo {
   left: number; top: number; right: number; bottom: number
 }
 
-export function MindMap({ state, dispatch, customTypes, onNavigateToMap, onFocusNode }: Props) {
+export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMap, onFocusNode }: Props) {
   const { nodes, rootId, selectedId, selectedIds, panX, panY, scale, dragId, dropId, collapsedIds } = state
 
+  // Star view: compute which nodes to show (starred + their ancestors)
+  const starViewData = useMemo(() => {
+    if (!starView) return null
+    const starredIds = new Set(Object.values(nodes).filter(n => n.starred).map(n => n.id))
+    const ancestorIds = new Set<string>()
+    for (const sid of starredIds) {
+      let cur = nodes[sid]
+      while (cur?.parentId) { ancestorIds.add(cur.parentId); cur = nodes[cur.parentId] }
+    }
+    const visibleIds = new Set([...starredIds, ...ancestorIds])
+    const filteredNodes: Record<string, MindNode> = {}
+    for (const id of visibleIds) {
+      const n = nodes[id]
+      if (n) filteredNodes[id] = { ...n, children: n.children.filter(c => visibleIds.has(c)) }
+    }
+    return { filteredNodes, starredIds, ancestorIds }
+  }, [starView, nodes])
+
+  const renderNodes = starViewData ? starViewData.filteredNodes : nodes
+
   const positions = useMemo(
-    () => calcLayout(nodes, rootId, collapsedIds, customTypes),
-    [nodes, rootId, collapsedIds, customTypes],
+    () => calcLayout(renderNodes, rootId, collapsedIds, customTypes),
+    [renderNodes, rootId, collapsedIds, customTypes],
   )
 
   // Compute canvas bounding box accounting for variable node heights
@@ -149,31 +170,33 @@ export function MindMap({ state, dispatch, customTypes, onNavigateToMap, onFocus
 
   // Build edges using dynamic type colors and variable node heights
   const edges: React.ReactNode[] = []
-  for (const [id, n] of Object.entries(nodes)) {
+  for (const [id, n] of Object.entries(renderNodes)) {
     const p = positions[id]
     if (!p) continue
     for (const cid of [...new Set(n.children)]) {
       const cp = positions[cid]
       if (!cp) continue
-      if (nodes[cid]?.parentId !== id) continue
+      if (renderNodes[cid]?.parentId !== id) continue
       const parentH = getNodeH(n, customTypes)
-      const childH = getNodeH(nodes[cid], customTypes)
+      const childH = getNodeH(renderNodes[cid], customTypes)
       const x1 = p.x - minX + NODE_W
       const y1 = p.y - minY + parentH / 2
       const x2 = cp.x - minX
       const y2 = cp.y - minY + childH / 2
       const mx = (x1 + x2) / 2
-      const childType = nodes[cid]?.type ?? 'task'
+      const childType = renderNodes[cid]?.type ?? 'task'
       const isSelected = selectedIds.includes(cid)
+      const isGhostEdge = starViewData && !starViewData.starredIds.has(cid)
       const meta = getTypeMeta(childType, customTypes)
       const isDimension = childType === 'dimension'
-      const color = isSelected ? meta.color : isDimension ? '#94A3B8' : meta.color + '55'
+      const color = isGhostEdge ? '#CBD5E1' : isSelected ? meta.color : isDimension ? '#94A3B8' : meta.color + '55'
       edges.push(
         <path key={`${id}-${cid}`}
           d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
           fill="none" stroke={color}
           strokeWidth={isSelected || dropId === cid ? 2 : 1.5}
-          strokeDasharray={nodes[cid]?.type === 'pending' ? '4 3' : undefined}
+          strokeDasharray={isGhostEdge ? '4 4' : renderNodes[cid]?.type === 'pending' ? '4 3' : undefined}
+          opacity={isGhostEdge ? 0.45 : 1}
         />
       )
     }
@@ -206,10 +229,23 @@ export function MindMap({ state, dispatch, customTypes, onNavigateToMap, onFocus
           {edges}
         </svg>
 
+        {/* Star view empty state */}
+        {starView && starViewData && starViewData.starredIds.size === 0 && (
+          <div style={{
+            position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)',
+            textAlign: 'center', color: '#94A3B8', pointerEvents: 'none',
+          }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>☆</div>
+            <div style={{ fontSize: 14 }}>还没有星标节点</div>
+            <div style={{ fontSize: 12, marginTop: 4, color: '#CBD5E1' }}>右键节点 → 加星标</div>
+          </div>
+        )}
+
         {Object.entries(positions).map(([id, pos]) => {
-          const n = nodes[id]
+          const n = renderNodes[id]
           if (!n) return null
           const nodeH = getNodeH(n, customTypes)
+          const isGhost = !!(starViewData && starViewData.ancestorIds.has(id))
           return (
             <NodeCard key={id} node={n}
               x={pos.x - minX} y={pos.y - minY}
@@ -220,6 +256,7 @@ export function MindMap({ state, dispatch, customTypes, onNavigateToMap, onFocus
               isDropTarget={dropId === id}
               isRoot={!n.parentId}
               isCollapsed={collapsedIds.includes(id)}
+              isGhost={isGhost}
               dragId={dragId}
               customTypes={customTypes}
               onNavigateToMap={onNavigateToMap}
@@ -353,7 +390,7 @@ interface NodeCardProps {
   node: MindNode; x: number; y: number; nodeH: number
   selected: boolean; multiSelected: boolean
   isDragging: boolean; isDropTarget: boolean; isRoot: boolean
-  isCollapsed: boolean
+  isCollapsed: boolean; isGhost: boolean
   dragId: string | null
   customTypes: NodeTypeDef[]
   onNavigateToMap: (mapId: string) => void
@@ -365,15 +402,38 @@ interface NodeCardProps {
 
 function NodeCard({
   node, x, y, nodeH, selected, multiSelected, isDragging, isDropTarget, isRoot,
-  isCollapsed, dragId, customTypes, onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
+  isCollapsed, isGhost, dragId, customTypes, onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
 }: NodeCardProps) {
+  const [cardHovered, setCardHovered] = useState(false)
   const meta = getTypeMeta(node.type, customTypes)
-  const typeDef = customTypes.find(t => t.id === node.type)
   const isEmpty = !node.type
   const isDimension = node.type === 'dimension' || isRoot
   const isWrapTitle = !isDimension
   const isHighlighted = selected || multiSelected
   const isDone = node.status === 'done'
+
+  // Ghost mode: ancestor node in star view — simplified, dimmed card
+  if (isGhost) {
+    return (
+      <div data-node={node.id} style={{
+        position: 'absolute', left: x, top: y,
+        width: NODE_W, height: nodeH,
+        background: '#F8FAFC', border: '1px solid #E2E8F0',
+        borderRadius: isDimension ? 10 : 8,
+        display: 'flex', alignItems: 'center',
+        opacity: 0.35, cursor: 'pointer', userSelect: 'none',
+      }}
+        onClick={e => { e.stopPropagation(); dispatch({ type: 'SELECT', id: node.id }) }}
+      >
+        <div style={{ width: isDimension ? 5 : 4, alignSelf: 'stretch', borderRadius: isDimension ? '10px 0 0 10px' : '8px 0 0 8px', background: '#CBD5E1', flexShrink: 0 }} />
+        <div style={{ flex: 1, padding: '0 8px', minWidth: 0, overflow: 'hidden' }}>
+          <div style={{ fontSize: 12, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {node.title}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const border = isDropTarget ? '2px solid #4F46E5'
     : isHighlighted ? `2px solid ${meta.color}`
@@ -406,8 +466,8 @@ function NodeCard({
       onDragEnd={() => dispatch({ type: 'DRAG_END' })}
       onDragOver={e => { e.preventDefault(); e.stopPropagation(); dispatch({ type: 'DRAG_OVER', nodeId: node.id }) }}
       onDrop={e => { e.preventDefault(); e.stopPropagation(); if (dragId) dispatch({ type: 'REPARENT', nodeId: dragId, newParentId: node.id }) }}
-      onMouseEnter={e => onHoverEnter(node.id, e.currentTarget.getBoundingClientRect())}
-      onMouseLeave={onHoverLeave}
+      onMouseEnter={e => { setCardHovered(true); onHoverEnter(node.id, e.currentTarget.getBoundingClientRect()) }}
+      onMouseLeave={() => { setCardHovered(false); onHoverLeave() }}
     >
       {/* Left accent bar */}
       <div style={{ width: isDimension ? 5 : 4, alignSelf: 'stretch', borderRadius: isDimension ? '10px 0 0 10px' : '8px 0 0 8px', background: meta.color, flexShrink: 0 }} />
@@ -443,6 +503,17 @@ function NodeCard({
 
       {/* Right indicators */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingRight: node.children.length > 0 ? 16 : 10, flexShrink: 0 }}>
+        {/* Star indicator */}
+        <span
+          onClick={e => { e.stopPropagation(); dispatch({ type: 'TOGGLE_STAR', nodeId: node.id }) }}
+          title={node.starred ? '取消星标' : '加星标'}
+          style={{
+            fontSize: 10, lineHeight: 1, cursor: 'pointer',
+            color: '#F59E0B',
+            opacity: node.starred ? 0.9 : cardHovered ? 0.3 : 0,
+            transition: 'opacity 0.15s',
+          }}
+        >★</span>
         {multiSelected && <div style={{ width: 14, height: 14, borderRadius: '50%', background: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span></div>}
         {node.priority && !multiSelected && <div style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_META[node.priority].color }} />}
         {isDone && !multiSelected && (
