@@ -25,6 +25,19 @@ export const TEMPLATES: Template[] = [
     ],
   },
   {
+    id: 'knowledge',
+    name: '知识图谱',
+    description: '概念分析与发散思维',
+    rootType: 'dimension',
+    types: [
+      { id: 'kd-dimension', label: '维度',   color: '#1E293B', bg: '#F1F5F9' },
+      { id: 'kd-feature',   label: '特征',   color: '#059669', bg: '#ECFDF5', wrapTitle: true },
+      { id: 'kd-case',      label: '案例',   color: '#EA580C', bg: '#FFF7ED', wrapTitle: true },
+      { id: 'kd-contrast',  label: '对比',   color: '#E11D48', bg: '#FFF1F2', wrapTitle: true },
+      { id: 'kd-relation',  label: '关联',   color: '#64748B', bg: '#F8FAFC', wrapTitle: true },
+    ],
+  },
+  {
     id: 'product',
     name: '产品管理',
     description: '面向产品规划与执行的标签体系',
