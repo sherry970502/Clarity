@@ -1,5 +1,5 @@
 'use client'
-import { useState, useReducer } from 'react'
+import { useState, useReducer, useEffect, useCallback } from 'react'
 import { reducer, AppState } from '@/lib/store'
 import { MindMap } from '@/components/MindMap'
 import { TaskList } from '@/components/TaskList'
@@ -7,8 +7,14 @@ import { MindNode, NodeTypeDef } from '@/lib/types'
 import { TEMPLATES } from '@/lib/templates'
 import { NodeFocusModal } from '@/components/NodeFocusModal'
 
-function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; nodes: Record<string, MindNode>; rootId: string; customTypes: NodeTypeDef[] }) {
+interface LinkedMap { id: string; title: string; shareToken: string }
+
+function ShareMapView({ title, nodes, rootId, customTypes, linkedMaps }: {
+  title: string; nodes: Record<string, MindNode>; rootId: string
+  customTypes: NodeTypeDef[]; linkedMaps: LinkedMap[]
+}) {
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
+  const [starView, setStarView] = useState(false)
   const initialState: AppState = {
     nodes,
     rootId,
@@ -27,10 +33,21 @@ function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; no
   }
   const [state, dispatch] = useReducer(reducer, initialState)
 
-  const readOnlyDispatch: typeof dispatch = (action) => {
-    const blocked = ['UPDATE', 'UPDATE_MULTI', 'ADD_CHILD', 'ADD_SIBLING', 'DELETE', 'DELETE_MULTI', 'REPARENT', 'MOVE_UP', 'MOVE_DOWN']
+  const readOnlyDispatch: typeof dispatch = useCallback((action) => {
+    const blocked = ['UPDATE', 'UPDATE_MULTI', 'ADD_CHILD', 'ADD_SIBLING', 'DELETE', 'DELETE_MULTI', 'REPARENT', 'MOVE_UP', 'MOVE_DOWN', 'TOGGLE_STAR']
     if (blocked.includes(action.type)) return
     dispatch(action)
+  }, [])
+
+  // Single-click to open detail modal in share view
+  useEffect(() => {
+    if (state.selectedId) setFocusedNodeId(state.selectedId)
+  }, [state.selectedId])
+
+  // Navigate to linked sub-map via its share token
+  const handleNavigateToMap = (mapId: string) => {
+    const linked = linkedMaps.find(m => m.id === mapId)
+    if (linked) window.location.href = `/share/${linked.shareToken}`
   }
 
   return (
@@ -51,26 +68,40 @@ function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; no
           {(['mindmap', 'list'] as const).map(v => (
             <button
               key={v}
-              onClick={() => dispatch({ type: 'SET_VIEW', view: v })}
+              onClick={() => { dispatch({ type: 'SET_VIEW', view: v }); setStarView(false) }}
               style={{
                 padding: '4px 12px', borderRadius: 6, border: 'none',
                 fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
-                fontWeight: state.view === v ? 600 : 400,
-                background: state.view === v ? '#fff' : 'transparent',
-                color: state.view === v ? '#1E293B' : '#64748B',
-                boxShadow: state.view === v ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                fontWeight: state.view === v && !starView ? 600 : 400,
+                background: state.view === v && !starView ? '#fff' : 'transparent',
+                color: state.view === v && !starView ? '#1E293B' : '#64748B',
+                boxShadow: state.view === v && !starView ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                 transition: 'all 0.15s',
               }}
             >
               {v === 'mindmap' ? '思维导图' : '任务列表'}
             </button>
           ))}
+          <button
+            onClick={() => { setStarView(v => !v); dispatch({ type: 'SET_VIEW', view: 'mindmap' }) }}
+            style={{
+              padding: '4px 10px', borderRadius: 6, border: 'none',
+              fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+              fontWeight: starView ? 600 : 400,
+              background: starView ? '#FFFBEB' : 'transparent',
+              color: starView ? '#D97706' : '#94A3B8',
+              boxShadow: starView ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            ☆ 星标
+          </button>
         </div>
       </header>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {state.view === 'mindmap' ? (
-          <MindMap state={state} dispatch={readOnlyDispatch} customTypes={customTypes} starView={false} onNavigateToMap={() => {}} onFocusNode={setFocusedNodeId} />
+          <MindMap state={state} dispatch={readOnlyDispatch} customTypes={customTypes} starView={starView} onNavigateToMap={handleNavigateToMap} onFocusNode={setFocusedNodeId} />
         ) : (
           <TaskList
             nodes={state.nodes}
@@ -86,9 +117,12 @@ function ShareMapView({ title, nodes, rootId, customTypes }: { title: string; no
         <NodeFocusModal
           node={state.nodes[focusedNodeId]}
           customTypes={customTypes}
-          allMaps={[]}
-          onClose={() => setFocusedNodeId(null)}
-          onNavigateToMap={() => {}}
+          allMaps={linkedMaps.map(m => ({ id: m.id, title: m.title }))}
+          onClose={() => {
+            setFocusedNodeId(null)
+            readOnlyDispatch({ type: 'CLEAR_SELECTION' })
+          }}
+          onNavigateToMap={handleNavigateToMap}
         />
       )}
     </div>
@@ -99,7 +133,7 @@ export function ShareViewer({ shareToken }: { shareToken: string }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [mapData, setMapData] = useState<{ title: string; nodes: Record<string, MindNode>; rootId: string; customTypes: NodeTypeDef[] } | null>(null)
+  const [mapData, setMapData] = useState<{ title: string; nodes: Record<string, MindNode>; rootId: string; customTypes: NodeTypeDef[]; linkedMaps: LinkedMap[] } | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -122,6 +156,7 @@ export function ShareViewer({ shareToken }: { shareToken: string }) {
           nodes: JSON.parse(data.nodesJson),
           rootId: data.rootId,
           customTypes,
+          linkedMaps: data.linkedMaps ?? [],
         })
       }
     } catch {
@@ -132,7 +167,7 @@ export function ShareViewer({ shareToken }: { shareToken: string }) {
   }
 
   if (mapData) {
-    return <ShareMapView title={mapData.title} nodes={mapData.nodes} rootId={mapData.rootId} customTypes={mapData.customTypes} />
+    return <ShareMapView title={mapData.title} nodes={mapData.nodes} rootId={mapData.rootId} customTypes={mapData.customTypes} linkedMaps={mapData.linkedMaps} />
   }
 
   return (
