@@ -7,9 +7,68 @@ import { MindMap } from '@/components/MindMap'
 import { DetailPanel } from '@/components/DetailPanel'
 import { TaskList } from '@/components/TaskList'
 import { ContextMenu } from '@/components/ContextMenu'
-import { MindNode, NodeTypeDef, Priority } from '@/lib/types'
+import { MindNode, NodeTypeDef, Priority, getTypeMeta, PRIORITY_META } from '@/lib/types'
 import { ShareModal } from '@/components/ShareModal'
 import { NodeFocusModal } from '@/components/NodeFocusModal'
+
+function exportToExcel(nodes: Record<string, MindNode>, rootId: string, customTypes: NodeTypeDef[], mapTitle: string) {
+  import('xlsx').then(XLSX => {
+    // First pass: find max depth
+    let maxDepth = 0
+    function calcDepth(id: string, depth: number) {
+      const node = nodes[id]
+      if (!node) return
+      if (depth > maxDepth) maxDepth = depth
+      for (const childId of node.children) calcDepth(childId, depth + 1)
+    }
+    calcDepth(rootId, 1)
+
+    // Second pass: build rows
+    const rows: Record<string, string>[] = []
+
+    function traverse(id: string, ancestors: string[]) {
+      const node = nodes[id]
+      if (!node) return
+      const depth = ancestors.length + 1  // current node's level (1-based)
+      const typeMeta = getTypeMeta(node.type, customTypes)
+
+      const row: Record<string, string> = {}
+      // Fill ancestor columns
+      ancestors.forEach((title, i) => { row[`第${i + 1}级`] = title })
+      // Current node goes in its own depth column
+      row[`第${depth}级`] = node.title
+      // Fill remaining depth columns with empty string
+      for (let i = depth + 1; i <= maxDepth; i++) row[`第${i}级`] = ''
+
+      row['类型'] = typeMeta.label || '—'
+      row['描述'] = node.description || ''
+      row['优先级'] = node.priority ? PRIORITY_META[node.priority].label : ''
+      row['状态'] = node.status === 'done' ? '已完成' : ''
+      row['URL'] = node.url || ''
+      row['星标'] = node.starred ? '★' : ''
+
+      rows.push(row)
+      for (const childId of node.children) traverse(childId, [...ancestors, node.title])
+    }
+
+    traverse(rootId, [])
+
+    // Build column order: 第1级…第N级, then meta columns
+    const levelCols = Array.from({ length: maxDepth }, (_, i) => `第${i + 1}级`)
+    const metaCols = ['类型', '描述', '优先级', '状态', 'URL', '星标']
+    const ws = XLSX.utils.json_to_sheet(rows, { header: [...levelCols, ...metaCols] })
+
+    // Column widths: 22 per level col, then meta widths
+    ws['!cols'] = [
+      ...levelCols.map(() => ({ wch: 22 })),
+      { wch: 10 }, { wch: 40 }, { wch: 8 }, { wch: 8 }, { wch: 30 }, { wch: 6 },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '节点列表')
+    XLSX.writeFile(wb, `${mapTitle}.xlsx`)
+  })
+}
 
 interface Props {
   mapId: string
@@ -241,6 +300,18 @@ export function MapClient({
             ☆ 星标
           </button>
         </div>
+
+        <button
+          onClick={() => exportToExcel(state.nodes, state.rootId, state.customTypes, title)}
+          style={{
+            padding: '5px 14px', borderRadius: 8, border: '1px solid #E2E8F0',
+            background: '#fff', color: '#64748B',
+            fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+          title="导出为 Excel"
+        >
+          导出
+        </button>
 
         <button
           onClick={() => setShowShareModal(true)}
