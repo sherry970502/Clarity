@@ -32,7 +32,7 @@ export async function PUT(
   const map = await getMap(mapId, session.user.id)
   if (!map) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { title, nodesJson, rootId } = await req.json()
+  const { title, nodesJson, rootId, customTypesJson } = await req.json()
 
   const updated = await prisma.mindMap.update({
     where: { id: mapId },
@@ -40,6 +40,7 @@ export async function PUT(
       ...(title !== undefined && { title }),
       ...(nodesJson !== undefined && { nodesJson }),
       ...(rootId !== undefined && { rootId }),
+      ...(customTypesJson !== undefined && { customTypesJson }),
     },
   })
 
