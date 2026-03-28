@@ -28,6 +28,15 @@ export function DetailPanel({
   const titleRef = useRef<HTMLInputElement>(null)
   const [showAddType, setShowAddType] = useState(false)
   const [newTypeLabel, setNewTypeLabel] = useState('')
+  const [titleValue, setTitleValue] = useState(node?.title ?? '')
+  const [descValue, setDescValue] = useState(node?.description ?? '')
+  const [urlValue, setUrlValue] = useState(node?.url ?? '')
+
+  useEffect(() => {
+    setTitleValue(node?.title ?? '')
+    setDescValue(node?.description ?? '')
+    setUrlValue(node?.url ?? '')
+  }, [node?.id])
   const [newTypeColor, setNewTypeColor] = useState(TYPE_COLOR_PRESETS[0])
 
   useEffect(() => {
@@ -125,13 +134,12 @@ export function DetailPanel({
           <label style={labelStyle}>标题</label>
           <input
             ref={titleRef}
-            defaultValue={node.title}
-            key={node.id + '-title'}
-            onBlur={e => onUpdate({ title: e.target.value || node.title })}
+            value={titleValue}
+            onChange={e => { setTitleValue(e.target.value); onUpdate({ title: e.target.value || node.title }) }}
             onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
             style={inputStyle}
             onFocus={e => (e.currentTarget.style.borderColor = '#4F46E5')}
-            onBlurCapture={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
+            onBlur={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
           />
         </div>
 
@@ -139,14 +147,13 @@ export function DetailPanel({
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>描述</label>
           <textarea
-            key={node.id + '-desc'}
-            defaultValue={node.description}
-            onBlur={e => onUpdate({ description: e.target.value })}
+            value={descValue}
+            onChange={e => { setDescValue(e.target.value); onUpdate({ description: e.target.value }) }}
             placeholder="补充说明、背景信息..."
             rows={4}
             style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
             onFocus={e => (e.currentTarget.style.borderColor = '#4F46E5')}
-            onBlurCapture={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
+            onBlur={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
           />
         </div>
 
@@ -225,17 +232,13 @@ export function DetailPanel({
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>链接</label>
           <input
-            key={node.id + '-url'}
-            defaultValue={node.url ?? ''}
+            value={urlValue}
+            onChange={e => { setUrlValue(e.target.value); onUpdate({ url: e.target.value.trim() || undefined }) }}
             placeholder="https://..."
-            onBlur={e => {
-              const val = e.target.value.trim()
-              onUpdate({ url: val || undefined })
-            }}
             onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
             style={inputStyle}
             onFocus={e => (e.currentTarget.style.borderColor = '#4F46E5')}
-            onBlurCapture={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
+            onBlur={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
           />
           {node.url && (
             <a
