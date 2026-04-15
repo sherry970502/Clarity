@@ -475,7 +475,7 @@ function NodeCard({
     }}
       draggable={!isRoot && !isEditing}
       onClick={e => { e.stopPropagation(); e.shiftKey ? dispatch({ type: 'MULTI_SELECT', id: node.id }) : dispatch({ type: 'SELECT', id: node.id }) }}
-      onDoubleClick={e => { e.stopPropagation(); setEditValue(node.title); setIsEditing(true) }}
+      onDoubleClick={e => { e.stopPropagation(); onFocusNode(node.id) }}
       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); dispatch({ type: 'OPEN_CTX', x: e.clientX, y: e.clientY, nodeId: node.id }) }}
       onDragStart={e => { e.stopPropagation(); dispatch({ type: 'DRAG_START', nodeId: node.id }); e.dataTransfer.effectAllowed = 'move' }}
       onDragEnd={() => dispatch({ type: 'DRAG_END' })}
