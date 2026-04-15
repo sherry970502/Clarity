@@ -8,6 +8,7 @@ interface Props {
   nodeId: string
   isRoot: boolean
   isStarred: boolean
+  hasChildren: boolean
   customTypes: NodeTypeDef[]
   onAddChild: () => void
   onAddSibling: () => void
@@ -15,12 +16,13 @@ interface Props {
   onChangeType: (t: string) => void
   onChangePriority: (p: Priority | null) => void
   onToggleStar: () => void
+  onSortChildren: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   onClose: () => void
 }
 
-export function ContextMenu({ x, y, nodeId, isRoot, isStarred, customTypes, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onToggleStar, onMoveUp, onMoveDown, onClose }: Props) {
+export function ContextMenu({ x, y, nodeId, isRoot, isStarred, hasChildren, customTypes, onAddChild, onAddSibling, onDelete, onChangeType, onChangePriority, onToggleStar, onSortChildren, onMoveUp, onMoveDown, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -79,6 +81,7 @@ export function ContextMenu({ x, y, nodeId, isRoot, isStarred, customTypes, onAd
       ))}
       {sep}
       <Item label={isStarred ? '取消星标' : '加星标'} onClick={() => { onToggleStar(); onClose() }} />
+      {hasChildren && <Item label="子节点按优先级排序" onClick={() => { onSortChildren(); onClose() }} />}
       {!isRoot && (
         <>
           {sep}

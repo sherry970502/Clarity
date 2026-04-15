@@ -92,6 +92,8 @@ export type Action =
   | { type: 'DRAG_OVER'; nodeId: string | null }
   | { type: 'DRAG_END' }
   | { type: 'REPARENT'; nodeId: string; newParentId: string }
+  | { type: 'REPARENT_MULTI'; nodeIds: string[]; newParentId: string }
+  | { type: 'SORT_CHILDREN_BY_PRIORITY'; nodeId: string }
   | { type: 'CLEAR_NEW' }
   | { type: 'TOGGLE_COLLAPSE'; nodeId: string }
   | { type: 'TOGGLE_STAR'; nodeId: string }
@@ -283,6 +285,58 @@ export function reducer(s: AppState, a: Action): AppState {
         dragId: null,
         dropId: null,
       }
+    }
+
+    case 'REPARENT_MULTI': {
+      const { nodeIds, newParentId } = a
+      const selectedSet = new Set(nodeIds)
+
+      const isDescOf = (ancestorId: string, targetId: string): boolean => {
+        if (targetId === ancestorId) return true
+        const t = s.nodes[targetId]
+        if (!t?.parentId) return false
+        return isDescOf(ancestorId, t.parentId)
+      }
+
+      // Only move top-level selected nodes whose parent is not also selected,
+      // skipping nodes that are already at newParent or would create a cycle
+      const toMove = nodeIds.filter(id => {
+        const n = s.nodes[id]
+        if (!n?.parentId) return false
+        if (n.parentId === newParentId) return false
+        if (selectedSet.has(n.parentId)) return false
+        if (isDescOf(id, newParentId)) return false
+        return true
+      })
+
+      if (toMove.length === 0) return s
+
+      const newNodes = { ...s.nodes }
+      for (const id of toMove) {
+        const n = newNodes[id]
+        if (!n?.parentId) continue
+        const oldParent = newNodes[n.parentId]
+        if (oldParent) newNodes[n.parentId] = { ...oldParent, children: oldParent.children.filter(c => c !== id) }
+        newNodes[id] = { ...n, parentId: newParentId }
+      }
+      const existing = newNodes[newParentId].children
+      newNodes[newParentId] = {
+        ...newNodes[newParentId],
+        children: [...existing, ...toMove.filter(id => !existing.includes(id))],
+      }
+      return { ...s, nodes: newNodes, dragId: null, dropId: null }
+    }
+
+    case 'SORT_CHILDREN_BY_PRIORITY': {
+      const n = s.nodes[a.nodeId]
+      if (!n || n.children.length <= 1) return s
+      const order: Record<string, number> = { high: 0, medium: 1, low: 2 }
+      const sorted = [...n.children].sort((a, b) => {
+        const pa = s.nodes[a]?.priority ?? null
+        const pb = s.nodes[b]?.priority ?? null
+        return (order[pa ?? ''] ?? 3) - (order[pb ?? ''] ?? 3)
+      })
+      return { ...s, nodes: { ...s.nodes, [a.nodeId]: { ...n, children: sorted } } }
     }
 
     case 'ADD_CUSTOM_TYPE': {

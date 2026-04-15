@@ -258,6 +258,7 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
               isCollapsed={collapsedIds.includes(id)}
               isGhost={isGhost}
               dragId={dragId}
+              selectedIds={selectedIds}
               customTypes={customTypes}
               onNavigateToMap={onNavigateToMap}
               onHoverEnter={handleHoverEnter}
@@ -392,6 +393,7 @@ interface NodeCardProps {
   isDragging: boolean; isDropTarget: boolean; isRoot: boolean
   isCollapsed: boolean; isGhost: boolean
   dragId: string | null
+  selectedIds: string[]
   customTypes: NodeTypeDef[]
   onNavigateToMap: (mapId: string) => void
   onHoverEnter: (nodeId: string, rect: DOMRect) => void
@@ -402,9 +404,22 @@ interface NodeCardProps {
 
 function NodeCard({
   node, x, y, nodeH, selected, multiSelected, isDragging, isDropTarget, isRoot,
-  isCollapsed, isGhost, dragId, customTypes, onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
+  isCollapsed, isGhost, dragId, selectedIds, customTypes, onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
 }: NodeCardProps) {
   const [cardHovered, setCardHovered] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(node.title)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (isEditing) inputRef.current?.focus()
+  }, [isEditing])
+
+  function commitEdit() {
+    const trimmed = editValue.trim()
+    dispatch({ type: 'UPDATE', nodeId: node.id, patch: { title: trimmed || node.title } })
+    setIsEditing(false)
+  }
   const meta = getTypeMeta(node.type, customTypes)
   const isEmpty = !node.type
   const isDimension = node.type === 'dimension' || isRoot
@@ -458,14 +473,22 @@ function NodeCard({
       transition: 'box-shadow 0.15s, border-color 0.15s, opacity 0.15s',
       userSelect: 'none',
     }}
-      draggable={!isRoot}
+      draggable={!isRoot && !isEditing}
       onClick={e => { e.stopPropagation(); e.shiftKey ? dispatch({ type: 'MULTI_SELECT', id: node.id }) : dispatch({ type: 'SELECT', id: node.id }) }}
-      onDoubleClick={e => { e.stopPropagation(); onFocusNode(node.id) }}
+      onDoubleClick={e => { e.stopPropagation(); setEditValue(node.title); setIsEditing(true) }}
       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); dispatch({ type: 'OPEN_CTX', x: e.clientX, y: e.clientY, nodeId: node.id }) }}
       onDragStart={e => { e.stopPropagation(); dispatch({ type: 'DRAG_START', nodeId: node.id }); e.dataTransfer.effectAllowed = 'move' }}
       onDragEnd={() => dispatch({ type: 'DRAG_END' })}
       onDragOver={e => { e.preventDefault(); e.stopPropagation(); dispatch({ type: 'DRAG_OVER', nodeId: node.id }) }}
-      onDrop={e => { e.preventDefault(); e.stopPropagation(); if (dragId) dispatch({ type: 'REPARENT', nodeId: dragId, newParentId: node.id }) }}
+      onDrop={e => {
+        e.preventDefault(); e.stopPropagation()
+        if (!dragId) return
+        if (selectedIds.length > 1 && selectedIds.includes(dragId)) {
+          dispatch({ type: 'REPARENT_MULTI', nodeIds: selectedIds, newParentId: node.id })
+        } else {
+          dispatch({ type: 'REPARENT', nodeId: dragId, newParentId: node.id })
+        }
+      }}
       onMouseEnter={e => { setCardHovered(true); onHoverEnter(node.id, e.currentTarget.getBoundingClientRect()) }}
       onMouseLeave={() => { setCardHovered(false); onHoverLeave() }}
     >
@@ -477,25 +500,45 @@ function NodeCard({
         {isDimension && node.type === 'dimension' && (
           <div style={{ fontSize: 9, color: meta.color, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>{meta.label}</div>
         )}
-        <div style={{
-          fontSize: 13, fontWeight: isDimension ? 600 : 500,
-          color: isDimension ? '#1E293B' : '#334155',
-          lineHeight: isDimension ? '1.2' : '1.4',
-          // wrapTitle: wrap up to 2 lines; others: single line ellipsis
-          ...(isWrapTitle ? {
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical' as const,
-            overflow: 'hidden',
-            whiteSpace: 'normal',
-          } : {
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }),
-        }}>
-          {node.title}
-        </div>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
+              if (e.key === 'Escape') { setIsEditing(false) }
+            }}
+            onClick={e => e.stopPropagation()}
+            onMouseDown={e => e.stopPropagation()}
+            style={{
+              width: '100%', fontSize: 13, fontWeight: isDimension ? 600 : 500,
+              color: isDimension ? '#1E293B' : '#334155',
+              border: 'none', outline: '2px solid #4F46E5', borderRadius: 4,
+              padding: '1px 4px', background: '#F8FAFF',
+            }}
+          />
+        ) : (
+          <div style={{
+            fontSize: 13, fontWeight: isDimension ? 600 : 500,
+            color: isDimension ? '#1E293B' : '#334155',
+            lineHeight: isDimension ? '1.2' : '1.4',
+            ...(isWrapTitle ? {
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical' as const,
+              overflow: 'hidden',
+              whiteSpace: 'normal',
+            } : {
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }),
+          }}>
+            {node.title}
+          </div>
+        )}
         {!isDimension && !isEmpty && (
           <div style={{ fontSize: 10, color: meta.color, opacity: 0.7, letterSpacing: '0.03em', marginTop: 2 }}>{meta.label}</div>
         )}

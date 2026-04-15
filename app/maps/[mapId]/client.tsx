@@ -423,6 +423,7 @@ export function MapClient({
           nodeId={state.ctx.nodeId}
           isRoot={state.ctx.nodeId === state.rootId}
           isStarred={!!state.nodes[state.ctx.nodeId]?.starred}
+          hasChildren={!!state.nodes[state.ctx.nodeId]?.children.length}
           customTypes={state.customTypes}
           onAddChild={() => { dispatch({ type: 'ADD_CHILD', parentId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onAddSibling={() => { dispatch({ type: 'ADD_SIBLING', nodeId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
@@ -430,6 +431,7 @@ export function MapClient({
           onChangeType={(t: string) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { type: t } }); dispatch({ type: 'CLOSE_CTX' }) }}
           onChangePriority={(p: Priority | null) => { dispatch({ type: 'UPDATE', nodeId: state.ctx!.nodeId, patch: { priority: p } }); dispatch({ type: 'CLOSE_CTX' }) }}
           onToggleStar={() => dispatch({ type: 'TOGGLE_STAR', nodeId: state.ctx!.nodeId })}
+          onSortChildren={() => { dispatch({ type: 'SORT_CHILDREN_BY_PRIORITY', nodeId: state.ctx!.nodeId }); dispatch({ type: 'CLOSE_CTX' }) }}
           onMoveUp={() => dispatch({ type: 'MOVE_UP', nodeId: state.ctx!.nodeId })}
           onMoveDown={() => dispatch({ type: 'MOVE_DOWN', nodeId: state.ctx!.nodeId })}
           onClose={() => dispatch({ type: 'CLOSE_CTX' })}
