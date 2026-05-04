@@ -28,6 +28,7 @@ model MindMap {
   shareToken        String?  @unique
   sharePasswordHash String?
   customTypesJson   String?  @db.Text
+  stickyNotesJson   String?  @db.Text
 
   @@index([userId])
 }

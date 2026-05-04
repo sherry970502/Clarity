@@ -1,4 +1,12 @@
 export type NodeType = string  // was union, now open string for custom types
+
+export interface StickyNote {
+  id: string
+  title: string
+  content: string
+  x: number
+  y: number
+}
 export type Priority = 'high' | 'medium' | 'low'
 export type Status = 'done'
 export type ViewMode = 'mindmap' | 'list'

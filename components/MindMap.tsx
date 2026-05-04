@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useCallback, useMemo, useState, useEffect } from 'react'
-import { MindNode, NodeTypeDef, getTypeMeta, PRIORITY_META } from '@/lib/types'
+import { MindNode, NodeTypeDef, StickyNote, getTypeMeta, PRIORITY_META } from '@/lib/types'
 import { calcLayout, getNodeH, NODE_W, NODE_H, H_GAP } from '@/lib/layout'
 import { AppState, Action } from '@/lib/store'
 
@@ -22,7 +22,7 @@ interface HoverInfo {
 }
 
 export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMap, onFocusNode }: Props) {
-  const { nodes, rootId, selectedId, selectedIds, panX, panY, scale, dragId, dropId, collapsedIds } = state
+  const { nodes, rootId, selectedId, selectedIds, panX, panY, scale, dragId, dropId, collapsedIds, stickyNotes } = state
 
   // Star view: compute which nodes to show (starred + their ancestors)
   const starViewData = useMemo(() => {
@@ -68,6 +68,10 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
   const [dragBox, setDragBox] = useState<DragBox | null>(null)
   const [altDown, setAltDown] = useState(false)
 
+  // Sticky note drag state (local visual position during drag)
+  const stickyDragRef = useRef<{ id: string; startMX: number; startMY: number; origX: number; origY: number } | null>(null)
+  const [localStickyPos, setLocalStickyPos] = useState<{ id: string; x: number; y: number } | null>(null)
+
   // Hover preview state
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -99,13 +103,35 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
       e.preventDefault(); return
     }
     if (e.button !== 0) return
-    if ((e.target as HTMLElement).closest('[data-node]')) return
+    if ((e.target as HTMLElement).closest('[data-node],[data-sticky]')) return
     const mode = e.altKey ? 'pan' : 'box'
     interactRef.current = { mode, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastY: e.clientY }
     e.preventDefault()
   }, [])
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
+    if (stickyDragRef.current) {
+      const drag = stickyDragRef.current
+      const dx = (e.clientX - drag.startMX) / scale
+      const dy = (e.clientY - drag.startMY) / scale
+      const newX = drag.origX + dx
+      const newY = drag.origY + dy
+      setLocalStickyPos({ id: drag.id, x: newX, y: newY })
+      // Detect hover over node for drop target highlight
+      const cx = newX - minX
+      const cy = newY - minY
+      let hovered: string | null = null
+      for (const [nodeId, pos] of Object.entries(positions)) {
+        const nx = pos.x - minX
+        const ny = pos.y - minY
+        const nh = getNodeH(nodes[nodeId], customTypes)
+        if (cx + STICKY_W / 2 > nx && cx + STICKY_W / 2 < nx + NODE_W && cy + 20 > ny && cy < ny + nh) {
+          hovered = nodeId; break
+        }
+      }
+      dispatch({ type: 'DRAG_OVER', nodeId: hovered })
+      return
+    }
     const ref = interactRef.current
     if (ref.mode === 'none') return
     if (ref.mode === 'pan') {
@@ -118,9 +144,39 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
       const h = Math.abs(e.clientY - ref.startY)
       if (w > 4 || h > 4) setDragBox({ x, y, w, h })
     }
-  }, [dispatch])
+  }, [dispatch, scale, minX, minY, positions, nodes, customTypes])
 
   const onMouseUp = useCallback((e: React.MouseEvent) => {
+    if (stickyDragRef.current) {
+      const drag = stickyDragRef.current
+      if (e.clientX !== undefined) {
+        // Recompute final position from drag start + current mouse delta (no stale closure)
+        const dx = (e.clientX - drag.startMX) / scale
+        const dy = (e.clientY - drag.startMY) / scale
+        const finalX = drag.origX + dx
+        const finalY = drag.origY + dy
+        const cx = finalX - minX
+        const cy = finalY - minY
+        let targetNodeId: string | null = null
+        for (const [nodeId, pos] of Object.entries(positions)) {
+          const nx = pos.x - minX
+          const ny = pos.y - minY
+          const nh = getNodeH(nodes[nodeId], customTypes)
+          if (cx + STICKY_W / 2 > nx && cx + STICKY_W / 2 < nx + NODE_W && cy + 20 > ny && cy < ny + nh) {
+            targetNodeId = nodeId; break
+          }
+        }
+        if (targetNodeId) {
+          dispatch({ type: 'CONVERT_STICKY', id: drag.id, parentId: targetNodeId })
+        } else {
+          dispatch({ type: 'MOVE_STICKY', id: drag.id, x: finalX, y: finalY })
+        }
+      }
+      dispatch({ type: 'DRAG_OVER', nodeId: null })
+      stickyDragRef.current = null
+      setLocalStickyPos(null)
+      return
+    }
     const ref = interactRef.current
     if (ref.mode === 'box' && dragBox && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
@@ -204,7 +260,17 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
 
   const hoveredNode = hoverInfo ? nodes[hoverInfo.nodeId] : null
 
-  const cursor = altDown ? 'grab' : dragBox ? 'crosshair' : 'default'
+  const cursor = altDown ? 'grab' : dragBox ? 'crosshair' : stickyDragRef.current ? 'grabbing' : 'default'
+
+  const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('[data-node],[data-sticky]')) return
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = (e.clientX - rect.left - panX) / scale + minX
+    const y = (e.clientY - rect.top - panY) / scale + minY
+    const id = `s${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    dispatch({ type: 'ADD_STICKY', id, x, y })
+  }, [panX, panY, scale, minX, minY, dispatch])
 
   return (
     <div
@@ -215,6 +281,7 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={() => { onMouseUp({} as React.MouseEvent); handleHoverLeave() }}
+      onDoubleClick={handleCanvasDoubleClick}
       onWheel={onWheel}
     >
       {/* Canvas */}
@@ -268,6 +335,24 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
             />
           )
         })}
+
+        {stickyNotes.map(note => {
+          const isDragging = localStickyPos?.id === note.id
+          const x = isDragging ? localStickyPos!.x - minX : note.x - minX
+          const y = isDragging ? localStickyPos!.y - minY : note.y - minY
+          return (
+            <StickyNoteCard
+              key={note.id}
+              note={note}
+              x={x} y={y}
+              isDragging={isDragging}
+              dispatch={dispatch}
+              onDragStart={(id, mx, my, nx, ny) => {
+                stickyDragRef.current = { id, startMX: mx, startMY: my, origX: nx, origY: ny }
+              }}
+            />
+          )
+        })}
       </div>
 
       {/* Grid dots */}
@@ -312,13 +397,119 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
       {/* Double-click hint */}
       {!altDown && !dragBox && (
         <div style={{ position: 'absolute', bottom: 12, right: 12, fontSize: 10, color: '#CBD5E1', pointerEvents: 'none' }}>
-          双击节点查看详情
+          双击节点查看详情 · 双击空白创建便签
         </div>
       )}
 
       {/* Hover preview card */}
       {hoveredNode && hoverInfo && (
         <HoverPreview node={hoveredNode} info={hoverInfo} customTypes={customTypes} />
+      )}
+    </div>
+  )
+}
+
+// ─── StickyNoteCard ───────────────────────────────────────────────────────────
+
+interface StickyNoteCardProps {
+  note: StickyNote
+  x: number; y: number
+  isDragging: boolean
+  dispatch: (a: Action) => void
+  onDragStart: (id: string, mx: number, my: number, nx: number, ny: number) => void
+}
+
+function StickyNoteCard({ note, x, y, isDragging, dispatch, onDragStart }: StickyNoteCardProps) {
+  const titleRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!note.title && !note.content) titleRef.current?.focus()
+  // Only run on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div
+      data-sticky={note.id}
+      style={{
+        position: 'absolute', left: x, top: y,
+        width: STICKY_W,
+        background: '#FEF9C3',
+        borderRadius: 6,
+        boxShadow: isDragging
+          ? '0 12px 32px rgba(0,0,0,0.2)'
+          : '0 3px 10px rgba(0,0,0,0.13)',
+        zIndex: isDragging ? 200 : 50,
+        transform: isDragging ? 'rotate(1.5deg) scale(1.03)' : 'rotate(-0.8deg)',
+        transition: isDragging ? 'none' : 'box-shadow 0.15s, transform 0.15s',
+        userSelect: 'none',
+        cursor: isDragging ? 'grabbing' : 'grab',
+      }}
+      onMouseDown={e => {
+        if ((e.target as HTMLElement).closest('input,textarea,button')) return
+        e.stopPropagation()
+        e.preventDefault()
+        onDragStart(note.id, e.clientX, e.clientY, note.x, note.y)
+      }}
+    >
+      {/* Delete button */}
+      <button
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => { e.stopPropagation(); dispatch({ type: 'DELETE_STICKY', id: note.id }) }}
+        style={{
+          position: 'absolute', top: 5, right: 6,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: '#92800A', fontSize: 15, lineHeight: 1, padding: '1px 3px',
+          opacity: 0.5, fontFamily: 'inherit',
+        }}
+      >×</button>
+
+      {/* Title */}
+      <input
+        ref={titleRef}
+        value={note.title}
+        onChange={e => dispatch({ type: 'UPDATE_STICKY', id: note.id, patch: { title: e.target.value } })}
+        placeholder="标题（选填）"
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '10px 24px 6px 10px',
+          border: 'none', background: 'transparent',
+          fontSize: 13, fontWeight: 600, color: '#713F12',
+          outline: 'none', fontFamily: 'inherit', cursor: 'text',
+        }}
+      />
+
+      {/* Divider */}
+      <div style={{ height: 1, background: '#EAD50F', opacity: 0.4, margin: '0 10px' }} />
+
+      {/* Body */}
+      <textarea
+        value={note.content}
+        onChange={e => dispatch({ type: 'UPDATE_STICKY', id: note.id, patch: { content: e.target.value } })}
+        placeholder="内容备注…"
+        rows={4}
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '6px 10px 10px',
+          border: 'none', background: 'transparent',
+          fontSize: 12, color: '#78350F', lineHeight: 1.55,
+          outline: 'none', fontFamily: 'inherit',
+          resize: 'none', cursor: 'text',
+          display: 'block',
+        }}
+      />
+
+      {/* Drag-to-node hint */}
+      {isDragging && (
+        <div style={{
+          position: 'absolute', bottom: -22, left: 0, right: 0,
+          textAlign: 'center', fontSize: 10, color: '#4F46E5',
+          pointerEvents: 'none',
+        }}>拖到节点上可转化为子节点</div>
       )}
     </div>
   )
@@ -384,6 +575,8 @@ function HoverPreview({ node, info, customTypes }: HoverPreviewProps) {
     </div>
   )
 }
+
+const STICKY_W = 210
 
 // ─── NodeCard ────────────────────────────────────────────────────────────────
 

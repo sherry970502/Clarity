@@ -33,6 +33,7 @@ function ShareMapView({ title, nodes, rootId, customTypes, linkedMaps }: {
     newNodeId: null,
     collapsedIds: defaultCollapsedIds,
     customTypes,
+    stickyNotes: [],
   }
   const [state, dispatch] = useReducer(reducer, initialState)
 

@@ -7,7 +7,7 @@ import { MindMap } from '@/components/MindMap'
 import { DetailPanel } from '@/components/DetailPanel'
 import { TaskList } from '@/components/TaskList'
 import { ContextMenu } from '@/components/ContextMenu'
-import { MindNode, NodeTypeDef, Priority, getTypeMeta, PRIORITY_META } from '@/lib/types'
+import { MindNode, NodeTypeDef, Priority, StickyNote, getTypeMeta, PRIORITY_META } from '@/lib/types'
 import { ShareModal } from '@/components/ShareModal'
 import { NodeFocusModal } from '@/components/NodeFocusModal'
 
@@ -75,6 +75,7 @@ interface Props {
   mapTitle: string
   initialNodes: Record<string, MindNode>
   initialCustomTypes: NodeTypeDef[]
+  initialStickyNotes: StickyNote[]
   rootId: string
   userName: string
   shareToken: string | null
@@ -84,7 +85,7 @@ interface Props {
 }
 
 export function MapClient({
-  mapId, mapTitle, initialNodes, initialCustomTypes, rootId,
+  mapId, mapTitle, initialNodes, initialCustomTypes, initialStickyNotes, rootId,
   userName, shareToken: initialShareToken,
   allMaps, fromMapId, fromMapTitle,
 }: Props) {
@@ -116,23 +117,28 @@ export function MapClient({
     newNodeId: null,
     collapsedIds: [],
     customTypes: initialCustomTypes,
+    stickyNotes: initialStickyNotes,
   }
 
-  const [state, dispatch] = useReducer(reducer, initialAppState, (base) => {
+  const [state, dispatch] = useReducer(reducer, initialAppState)
+
+  // Load collapsed state from localStorage after mount (avoids SSR hydration mismatch)
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(`clarity-collapsed-${mapId}`)
-      return { ...base, collapsedIds: saved ? JSON.parse(saved) : [] }
-    } catch {
-      return base
-    }
-  })
+      if (saved) {
+        const ids = JSON.parse(saved)
+        if (ids.length > 0) dispatch({ type: 'SET_COLLAPSED_IDS', ids })
+      }
+    } catch {}
+  }, [mapId])
 
   // Persist collapsed state to localStorage
   useEffect(() => {
     localStorage.setItem(`clarity-collapsed-${mapId}`, JSON.stringify(state.collapsedIds))
   }, [state.collapsedIds, mapId])
 
-  // Auto-save nodes with debounce
+  // Auto-save nodes and sticky notes with debounce
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false
@@ -145,12 +151,15 @@ export function MapClient({
       await fetch(`/api/maps/${mapId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodesJson: JSON.stringify(state.nodes) }),
+        body: JSON.stringify({
+          nodesJson: JSON.stringify(state.nodes),
+          stickyNotesJson: JSON.stringify(state.stickyNotes),
+        }),
       })
       setSaveStatus('saved')
     }, 1200)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.nodes, mapId])
+  }, [state.nodes, state.stickyNotes, mapId])
 
   // Auto-save customTypes when they change
   useEffect(() => {

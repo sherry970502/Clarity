@@ -3,7 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import { MapClient } from './client'
-import { MindNode, NodeTypeDef } from '@/lib/types'
+import { MindNode, NodeTypeDef, StickyNote } from '@/lib/types'
 import { TEMPLATES } from '@/lib/templates'
 
 export default async function MapPage({
@@ -68,6 +68,13 @@ export default async function MapPage({
     }
   })
 
+  let stickyNotes: StickyNote[] = []
+  try {
+    stickyNotes = map.stickyNotesJson ? JSON.parse(map.stickyNotesJson) : []
+  } catch {
+    stickyNotes = []
+  }
+
   // Fetch the "from" map title for back navigation
   let fromMapTitle: string | null = null
   if (fromMapId) {
@@ -87,6 +94,7 @@ export default async function MapPage({
       allMaps={allMaps.filter(m => m.id !== mapId)}
       fromMapId={fromMapId ?? null}
       fromMapTitle={fromMapTitle}
+      initialStickyNotes={stickyNotes}
     />
   )
 }

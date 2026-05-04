@@ -1,4 +1,4 @@
-import { MindNode, NodeType, NodeTypeDef, Priority, Status, ViewMode } from './types'
+import { MindNode, NodeType, NodeTypeDef, Priority, Status, ViewMode, StickyNote } from './types'
 import { TEMPLATES } from './templates'
 
 const DEFAULT_CUSTOM_TYPES: NodeTypeDef[] = TEMPLATES[0].types
@@ -50,6 +50,7 @@ export interface AppState {
   newNodeId: string | null
   collapsedIds: string[]
   customTypes: NodeTypeDef[]
+  stickyNotes: StickyNote[]
 }
 
 export const initialState: AppState = {
@@ -67,6 +68,7 @@ export const initialState: AppState = {
   newNodeId: null,
   collapsedIds: [],
   customTypes: DEFAULT_CUSTOM_TYPES,
+  stickyNotes: [],
 }
 
 export type Action =
@@ -98,7 +100,13 @@ export type Action =
   | { type: 'TOGGLE_COLLAPSE'; nodeId: string }
   | { type: 'COLLAPSE_ALL' }
   | { type: 'EXPAND_ALL' }
+  | { type: 'SET_COLLAPSED_IDS'; ids: string[] }
   | { type: 'TOGGLE_STAR'; nodeId: string }
+  | { type: 'ADD_STICKY'; id: string; x: number; y: number }
+  | { type: 'UPDATE_STICKY'; id: string; patch: Partial<Pick<StickyNote, 'title' | 'content'>> }
+  | { type: 'MOVE_STICKY'; id: string; x: number; y: number }
+  | { type: 'DELETE_STICKY'; id: string }
+  | { type: 'CONVERT_STICKY'; id: string; parentId: string }
 
 export function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
@@ -367,6 +375,9 @@ export function reducer(s: AppState, a: Action): AppState {
       return { ...s, collapsedIds: already ? s.collapsedIds.filter(id => id !== a.nodeId) : [...s.collapsedIds, a.nodeId] }
     }
 
+    case 'SET_COLLAPSED_IDS':
+      return { ...s, collapsedIds: a.ids }
+
     case 'COLLAPSE_ALL': {
       const ids = Object.values(s.nodes).filter(n => n.children.length > 0).map(n => n.id)
       return { ...s, collapsedIds: ids }
@@ -379,6 +390,52 @@ export function reducer(s: AppState, a: Action): AppState {
       const n = s.nodes[a.nodeId]
       if (!n) return s
       return { ...s, nodes: { ...s.nodes, [a.nodeId]: { ...n, starred: !n.starred } } }
+    }
+
+    case 'ADD_STICKY':
+      return {
+        ...s,
+        stickyNotes: [...s.stickyNotes, { id: a.id, title: '', content: '', x: a.x, y: a.y }],
+      }
+
+    case 'UPDATE_STICKY':
+      return {
+        ...s,
+        stickyNotes: s.stickyNotes.map(n => n.id === a.id ? { ...n, ...a.patch } : n),
+      }
+
+    case 'MOVE_STICKY':
+      return {
+        ...s,
+        stickyNotes: s.stickyNotes.map(n => n.id === a.id ? { ...n, x: a.x, y: a.y } : n),
+      }
+
+    case 'DELETE_STICKY':
+      return { ...s, stickyNotes: s.stickyNotes.filter(n => n.id !== a.id) }
+
+    case 'CONVERT_STICKY': {
+      const sticky = s.stickyNotes.find(n => n.id === a.id)
+      if (!sticky) return s
+      const parent = s.nodes[a.parentId]
+      if (!parent) return s
+      const id = gid()
+      const titleText = sticky.title.trim()
+      const title = titleText || sticky.content.split('\n')[0].trim()
+      const description = titleText
+        ? sticky.content
+        : sticky.content.split('\n').slice(1).join('\n').trim()
+      return {
+        ...s,
+        stickyNotes: s.stickyNotes.filter(n => n.id !== a.id),
+        nodes: {
+          ...s.nodes,
+          [id]: { id, title, description, type: '', priority: null, children: [], parentId: a.parentId },
+          [a.parentId]: { ...parent, children: [...parent.children, id] },
+        },
+        selectedId: id,
+        selectedIds: [id],
+        newNodeId: id,
+      }
     }
 
     default: return s
