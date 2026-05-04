@@ -96,6 +96,8 @@ export type Action =
   | { type: 'SORT_CHILDREN_BY_PRIORITY'; nodeId: string }
   | { type: 'CLEAR_NEW' }
   | { type: 'TOGGLE_COLLAPSE'; nodeId: string }
+  | { type: 'COLLAPSE_ALL' }
+  | { type: 'EXPAND_ALL' }
   | { type: 'TOGGLE_STAR'; nodeId: string }
 
 export function reducer(s: AppState, a: Action): AppState {
@@ -131,7 +133,7 @@ export function reducer(s: AppState, a: Action): AppState {
         ...s,
         nodes: {
           ...s.nodes,
-          [id]: node(id, '新节点', '', a.parentId),
+          [id]: node(id, '', '', a.parentId),
           [a.parentId]: { ...parent, children: [...parent.children, id] },
         },
         selectedId: id,
@@ -153,7 +155,7 @@ export function reducer(s: AppState, a: Action): AppState {
         ...s,
         nodes: {
           ...s.nodes,
-          [id]: node(id, '新节点', '', n.parentId),
+          [id]: node(id, '', '', n.parentId),
           [n.parentId]: { ...parent, children },
         },
         selectedId: id,
@@ -207,7 +209,20 @@ export function reducer(s: AppState, a: Action): AppState {
     case 'UPDATE': {
       const n = s.nodes[a.nodeId]
       if (!n) return s
-      return { ...s, nodes: { ...s.nodes, [a.nodeId]: { ...n, ...a.patch } } }
+      const updatedNodes = { ...s.nodes, [a.nodeId]: { ...n, ...a.patch } }
+      if ('priority' in a.patch && n.parentId) {
+        const parent = updatedNodes[n.parentId]
+        if (parent) {
+          const order: Record<string, number> = { high: 0, medium: 1, low: 2 }
+          const sorted = [...parent.children].sort((x, y) => {
+            const px = updatedNodes[x]?.priority ?? null
+            const py = updatedNodes[y]?.priority ?? null
+            return (order[px ?? ''] ?? 3) - (order[py ?? ''] ?? 3)
+          })
+          updatedNodes[n.parentId] = { ...parent, children: sorted }
+        }
+      }
+      return { ...s, nodes: updatedNodes }
     }
 
     case 'UPDATE_MULTI': {
@@ -351,6 +366,14 @@ export function reducer(s: AppState, a: Action): AppState {
       const already = s.collapsedIds.includes(a.nodeId)
       return { ...s, collapsedIds: already ? s.collapsedIds.filter(id => id !== a.nodeId) : [...s.collapsedIds, a.nodeId] }
     }
+
+    case 'COLLAPSE_ALL': {
+      const ids = Object.values(s.nodes).filter(n => n.children.length > 0).map(n => n.id)
+      return { ...s, collapsedIds: ids }
+    }
+
+    case 'EXPAND_ALL':
+      return { ...s, collapsedIds: [] }
 
     case 'TOGGLE_STAR': {
       const n = s.nodes[a.nodeId]

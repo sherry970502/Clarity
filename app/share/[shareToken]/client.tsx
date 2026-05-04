@@ -15,6 +15,9 @@ function ShareMapView({ title, nodes, rootId, customTypes, linkedMaps }: {
 }) {
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [starView, setStarView] = useState(false)
+  const defaultCollapsedIds = Object.values(nodes)
+    .filter(n => n.children.length > 0 && n.id !== rootId)
+    .map(n => n.id)
   const initialState: AppState = {
     nodes,
     rootId,
@@ -28,7 +31,7 @@ function ShareMapView({ title, nodes, rootId, customTypes, linkedMaps }: {
     dragId: null,
     dropId: null,
     newNodeId: null,
-    collapsedIds: [],
+    collapsedIds: defaultCollapsedIds,
     customTypes,
   }
   const [state, dispatch] = useReducer(reducer, initialState)

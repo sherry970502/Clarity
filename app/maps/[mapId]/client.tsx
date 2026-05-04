@@ -301,6 +301,33 @@ export function MapClient({
           </button>
         </div>
 
+        {state.view === 'mindmap' && (
+          <div style={{ display: 'flex', gap: 2, background: '#F1F5F9', borderRadius: 8, padding: 3 }}>
+            <button
+              onClick={() => dispatch({ type: 'COLLAPSE_ALL' })}
+              title="全部折叠"
+              style={{
+                padding: '4px 10px', borderRadius: 6, border: 'none',
+                fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+                background: 'transparent', color: '#64748B',
+              }}
+            >
+              折叠
+            </button>
+            <button
+              onClick={() => dispatch({ type: 'EXPAND_ALL' })}
+              title="全部展开"
+              style={{
+                padding: '4px 10px', borderRadius: 6, border: 'none',
+                fontSize: 12, fontFamily: 'inherit', cursor: 'pointer',
+                background: 'transparent', color: '#64748B',
+              }}
+            >
+              展开
+            </button>
+          </div>
+        )}
+
         <button
           onClick={() => exportToExcel(state.nodes, state.rootId, state.customTypes, title)}
           style={{

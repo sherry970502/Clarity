@@ -14,15 +14,16 @@ interface Props {
   onUpdateStatus: (id: string, status?: Status) => void
 }
 
-function findDimensionTitle(nodes: Record<string, MindNode>, id: string, rootId: string): string | null {
+function findAncestorPath(nodes: Record<string, MindNode>, id: string, rootId: string): string | null {
+  const path: string[] = []
   let cur = nodes[id]?.parentId
   while (cur && cur !== rootId) {
     const n = nodes[cur]
     if (!n) break
-    if (n.type === 'dimension') return n.title
+    path.unshift(n.title)
     cur = n.parentId
   }
-  return null
+  return path.length > 0 ? path.join(' / ') : null
 }
 
 function isUnderDimension(nodes: Record<string, MindNode>, nodeId: string, dimId: string): boolean {
@@ -257,7 +258,7 @@ interface TaskItemProps {
 
 function TaskItem({ n, nodes, rootId, customTypes, onSelect, onUpdateStatus }: TaskItemProps) {
   const meta = getTypeMeta(n.type, customTypes)
-  const dim = findDimensionTitle(nodes, n.id, rootId)
+  const dim = findAncestorPath(nodes, n.id, rootId)
   const isDone = n.status === 'done'
 
   return (
