@@ -19,14 +19,29 @@ export default async function MapPage({
   if (!session?.user?.id) redirect('/login')
 
   const [map, allMaps] = await Promise.all([
-    prisma.mindMap.findFirst({ where: { id: mapId, userId: session.user.id } }),
+    prisma.mindMap.findFirst({
+      where: {
+        id: mapId,
+        OR: [
+          { userId: session.user.id },
+          { collaborators: { some: { userId: session.user.id } } },
+        ],
+      },
+    }),
     prisma.mindMap.findMany({
-      where: { userId: session.user.id },
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { collaborators: { some: { userId: session.user.id } } },
+        ],
+      },
       orderBy: { updatedAt: 'desc' },
       select: { id: true, title: true },
     }),
   ])
   if (!map) notFound()
+
+  const isOwner = map.userId === session.user.id
 
   let nodes: Record<string, MindNode>
   try {
@@ -95,6 +110,7 @@ export default async function MapPage({
       fromMapId={fromMapId ?? null}
       fromMapTitle={fromMapTitle}
       initialStickyNotes={stickyNotes}
+      isOwner={isOwner}
     />
   )
 }

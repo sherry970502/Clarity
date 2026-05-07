@@ -9,16 +9,21 @@ interface MapItem {
   title: string
   updatedAt: Date | string
   createdAt: Date | string
+  collaborators?: { user: { id: string; name: string } }[]
+  isCollaborated?: boolean
+  ownerName?: string
 }
 
 interface Props {
   maps: MapItem[]
+  collaboratedMaps: MapItem[]
   userName: string
 }
 
-export function DashboardClient({ maps: initialMaps, userName }: Props) {
+export function DashboardClient({ maps: initialMaps, collaboratedMaps: initialCollaboratedMaps, userName }: Props) {
   const router = useRouter()
   const [maps, setMaps] = useState(initialMaps)
+  const [collaboratedMaps] = useState(initialCollaboratedMaps)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id)
@@ -44,9 +49,9 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const filteredMaps = searchQuery.trim()
-    ? maps.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase().trim()))
-    : maps
+  const q = searchQuery.toLowerCase().trim()
+  const filteredMaps = q ? maps.filter(m => m.title.toLowerCase().includes(q)) : maps
+  const filteredCollaborated = q ? collaboratedMaps.filter(m => m.title.toLowerCase().includes(q)) : collaboratedMaps
 
   async function createMap() {
     if (creating) return
@@ -235,7 +240,7 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
             <div style={{ fontSize: 40, marginBottom: 12 }}>🗺</div>
             <div style={{ fontSize: 15, color: '#94A3B8' }}>还没有战略图，点击「新建」开始</div>
           </div>
-        ) : filteredMaps.length === 0 ? (
+        ) : filteredMaps.length === 0 && filteredCollaborated.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 0' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
             <div style={{ fontSize: 14, color: '#94A3B8' }}>没有匹配「{searchQuery}」的图谱</div>
@@ -266,9 +271,15 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#1E293B', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.title}
                 </div>
-                <div style={{ fontSize: 11, color: '#94A3B8' }}>
+                <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: m.collaborators && m.collaborators.length > 0 ? 6 : 0 }}>
                   更新于 {formatDate(m.updatedAt)}
                 </div>
+                {m.collaborators && m.collaborators.length > 0 && (
+                  <div style={{ fontSize: 10, color: '#6366F1', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>👥</span>
+                    <span>{m.collaborators.length} 位协作者</span>
+                  </div>
+                )}
                 {/* Duplicate button */}
                 <button
                   onClick={e => { e.stopPropagation(); duplicateMap(m.id) }}
@@ -302,6 +313,47 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Collaborated maps section */}
+        {filteredCollaborated.length > 0 && (
+          <div style={{ marginTop: 40 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>协作图谱</span>
+              <span style={{ fontSize: 11, background: '#F1F5F9', color: '#64748B', borderRadius: 10, padding: '1px 8px' }}>
+                {filteredCollaborated.length}
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+              {filteredCollaborated.map(m => (
+                <div
+                  key={m.id}
+                  style={{
+                    background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12,
+                    padding: '18px 18px 14px', cursor: 'pointer',
+                    transition: 'box-shadow 0.15s', position: 'relative',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)')}
+                  onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                  onClick={() => router.push(`/maps/${m.id}`)}
+                >
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: 16 }}>🗺</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1E293B', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
+                    {m.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6 }}>
+                    更新于 {formatDate(m.updatedAt)}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ fontSize: 10, background: '#ECFDF5', color: '#16A34A', border: '1px solid #BBF7D0', borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>协作</span>
+                    <span style={{ fontSize: 11, color: '#94A3B8' }}>来自 {m.ownerName}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

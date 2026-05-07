@@ -8,27 +8,41 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  maps         MindMap[]
-  createdAt    DateTime  @default(now())
+  id             String             @id @default(cuid())
+  email          String             @unique
+  passwordHash   String
+  name           String
+  maps           MindMap[]
+  collaborations MapCollaborator[]
+  createdAt      DateTime           @default(now())
 }
 
 model MindMap {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String   @default("无标题")
-  nodesJson String   @db.Text
-  rootId    String
-  updatedAt         DateTime @updatedAt
-  createdAt         DateTime @default(now())
-  shareToken        String?  @unique
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title             String            @default("无标题")
+  nodesJson         String            @db.Text
+  rootId            String
+  updatedAt         DateTime          @updatedAt
+  createdAt         DateTime          @default(now())
+  shareToken        String?           @unique
   sharePasswordHash String?
-  customTypesJson   String?  @db.Text
-  stickyNotesJson   String?  @db.Text
+  customTypesJson   String?           @db.Text
+  stickyNotesJson   String?           @db.Text
+  collaborators     MapCollaborator[]
 
+  @@index([userId])
+}
+
+model MapCollaborator {
+  id        String   @id @default(cuid())
+  mapId     String
+  userId    String
+  map       MindMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedAt DateTime @default(now())
+
+  @@unique([mapId, userId])
   @@index([userId])
 }

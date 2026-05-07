@@ -71,6 +71,142 @@ function exportToExcel(nodes: Record<string, MindNode>, rootId: string, customTy
   })
 }
 
+type Collaborator = { id: string; user: { id: string; name: string | null; email: string | null } }
+
+function CollaboratorModal({ mapId, onClose }: { mapId: string; onClose: () => void }) {
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [loading, setLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/maps/${mapId}/collaborators`)
+      .then(r => r.json())
+      .then(data => { setCollaborators(Array.isArray(data) ? data : []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [mapId])
+
+  async function invite() {
+    if (!email.trim()) return
+    setInviting(true)
+    setError(null)
+    const res = await fetch(`/api/maps/${mapId}/collaborators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setError(data.error ?? '邀请失败')
+    } else {
+      setCollaborators(prev => [...prev, data])
+      setEmail('')
+    }
+    setInviting(false)
+  }
+
+  async function remove(userId: string) {
+    setRemoving(userId)
+    await fetch(`/api/maps/${mapId}/collaborators`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+    setCollaborators(prev => prev.filter(c => c.user.id !== userId))
+    setRemoving(null)
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#fff', borderRadius: 12, padding: 28, width: 420, boxShadow: '0 8px 32px rgba(0,0,0,0.16)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1E293B' }}>协作者管理</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#94A3B8', lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Invite input */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+          <input
+            type="email"
+            value={email}
+            onChange={e => { setEmail(e.target.value); setError(null) }}
+            onKeyDown={e => { if (e.key === 'Enter') invite() }}
+            placeholder="输入邮箱地址"
+            style={{
+              flex: 1, padding: '8px 12px', borderRadius: 8,
+              border: error ? '1px solid #EF4444' : '1px solid #E2E8F0',
+              fontSize: 13, outline: 'none', fontFamily: 'inherit', color: '#1E293B',
+            }}
+          />
+          <button
+            onClick={invite}
+            disabled={inviting || !email.trim()}
+            style={{
+              padding: '8px 16px', borderRadius: 8, border: 'none',
+              background: inviting || !email.trim() ? '#E2E8F0' : '#4F46E5',
+              color: inviting || !email.trim() ? '#94A3B8' : '#fff',
+              fontSize: 13, cursor: inviting || !email.trim() ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit', fontWeight: 600, whiteSpace: 'nowrap',
+            }}
+          >
+            {inviting ? '邀请中…' : '邀请'}
+          </button>
+        </div>
+        {error && <p style={{ margin: '0 0 8px', fontSize: 12, color: '#EF4444' }}>{error}</p>}
+        <p style={{ margin: '0 0 20px', fontSize: 11, color: '#94A3B8' }}>对方需要已有 Clarity 账号才能接受邀请</p>
+
+        {/* Collaborator list */}
+        <div>
+          {loading ? (
+            <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: 13, padding: '16px 0', margin: 0 }}>加载中…</p>
+          ) : collaborators.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#CBD5E1', fontSize: 13, padding: '16px 0', margin: 0 }}>暂无协作者</p>
+          ) : (
+            collaborators.map(c => (
+              <div key={c.user.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: '1px solid #F1F5F9' }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%', background: '#EEF2FF',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 13, fontWeight: 700, color: '#4F46E5', flexShrink: 0,
+                }}>
+                  {(c.user.name ?? c.user.email ?? '?')[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.user.name ?? '—'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.user.email}
+                  </div>
+                </div>
+                <button
+                  onClick={() => remove(c.user.id)}
+                  disabled={removing === c.user.id}
+                  style={{
+                    background: 'none', border: '1px solid #FCA5A5', borderRadius: 6,
+                    color: '#EF4444', fontSize: 11, padding: '3px 10px', cursor: 'pointer',
+                    fontFamily: 'inherit', opacity: removing === c.user.id ? 0.5 : 1,
+                  }}
+                >
+                  {removing === c.user.id ? '移除中' : '移除'}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface Props {
   mapId: string
   mapTitle: string
@@ -83,16 +219,18 @@ interface Props {
   allMaps: { id: string; title: string }[]
   fromMapId: string | null
   fromMapTitle: string | null
+  isOwner: boolean
 }
 
 export function MapClient({
   mapId, mapTitle, initialNodes, initialCustomTypes, initialStickyNotes, rootId,
   userName, shareToken: initialShareToken,
-  allMaps, fromMapId, fromMapTitle,
+  allMaps, fromMapId, fromMapTitle, isOwner,
 }: Props) {
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken)
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showCollabModal, setShowCollabModal] = useState(false)
   const [starView, setStarView] = useState(false)
   const router = useRouter()
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
@@ -350,6 +488,23 @@ export function MapClient({
           导出
         </button>
 
+        {isOwner && (
+          <button
+            onClick={() => setShowCollabModal(true)}
+            style={{
+              padding: '5px 14px', borderRadius: 8, border: '1px solid #E2E8F0',
+              background: '#fff', color: '#64748B',
+              fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            协作者
+          </button>
+        )}
+        {!isOwner && (
+          <span style={{ fontSize: 11, color: '#16A34A', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6, padding: '4px 10px' }}>
+            协作编辑
+          </span>
+        )}
         <button
           onClick={() => setShowShareModal(true)}
           style={{
@@ -433,6 +588,10 @@ export function MapClient({
           onNavigateToMap={handleNavigateToMap}
         />
       </div>
+
+      {showCollabModal && (
+        <CollaboratorModal mapId={mapId} onClose={() => setShowCollabModal(false)} />
+      )}
 
       {showShareModal && (
         <ShareModal

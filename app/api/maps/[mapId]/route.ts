@@ -4,7 +4,12 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 
 async function getMap(mapId: string, userId: string) {
-  return prisma.mindMap.findFirst({ where: { id: mapId, userId } })
+  return prisma.mindMap.findFirst({
+    where: {
+      id: mapId,
+      OR: [{ userId }, { collaborators: { some: { userId } } }],
+    },
+  })
 }
 
 export async function GET(

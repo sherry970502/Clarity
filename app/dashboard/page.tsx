@@ -8,11 +8,44 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) redirect('/login')
 
-  const maps = await prisma.mindMap.findMany({
-    where: { userId: session.user.id },
-    orderBy: { updatedAt: 'desc' },
-    select: { id: true, title: true, updatedAt: true, createdAt: true },
-  })
+  const [ownedMaps, collaborations] = await Promise.all([
+    prisma.mindMap.findMany({
+      where: { userId: session.user.id },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true, title: true, updatedAt: true, createdAt: true,
+        collaborators: { select: { user: { select: { id: true, name: true } } } },
+      },
+    }),
+    prisma.mapCollaborator.findMany({
+      where: { userId: session.user.id },
+      include: {
+        map: {
+          select: {
+            id: true, title: true, updatedAt: true, createdAt: true,
+            user: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { map: { updatedAt: 'desc' } },
+    }),
+  ])
 
-  return <DashboardClient maps={maps} userName={session.user.name} />
+  const collaboratedMaps = collaborations.map(c => ({
+    id: c.map.id,
+    title: c.map.title,
+    updatedAt: c.map.updatedAt,
+    createdAt: c.map.createdAt,
+    isCollaborated: true as const,
+    ownerName: c.map.user.name,
+    collaborators: [],
+  }))
+
+  return (
+    <DashboardClient
+      maps={ownedMaps}
+      collaboratedMaps={collaboratedMaps}
+      userName={session.user.name}
+    />
+  )
 }
