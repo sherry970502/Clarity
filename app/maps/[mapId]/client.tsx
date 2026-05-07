@@ -43,7 +43,8 @@ function exportToExcel(nodes: Record<string, MindNode>, rootId: string, customTy
       row['类型'] = typeMeta.label || '—'
       row['描述'] = node.description || ''
       row['优先级'] = node.priority ? PRIORITY_META[node.priority].label : ''
-      row['状态'] = node.status === 'done' ? '已完成' : ''
+      row['状态'] = node.status === 'done' ? '已完成' : node.status === 'in_progress' ? '进行中' : ''
+      row['负责人'] = node.assignee || ''
       row['URL'] = node.url || ''
       row['星标'] = node.starred ? '★' : ''
 
@@ -55,13 +56,13 @@ function exportToExcel(nodes: Record<string, MindNode>, rootId: string, customTy
 
     // Build column order: 第1级…第N级, then meta columns
     const levelCols = Array.from({ length: maxDepth }, (_, i) => `第${i + 1}级`)
-    const metaCols = ['类型', '描述', '优先级', '状态', 'URL', '星标']
+    const metaCols = ['类型', '描述', '优先级', '状态', '负责人', 'URL', '星标']
     const ws = XLSX.utils.json_to_sheet(rows, { header: [...levelCols, ...metaCols] })
 
     // Column widths: 22 per level col, then meta widths
     ws['!cols'] = [
       ...levelCols.map(() => ({ wch: 22 })),
-      { wch: 10 }, { wch: 40 }, { wch: 8 }, { wch: 8 }, { wch: 30 }, { wch: 6 },
+      { wch: 10 }, { wch: 40 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 30 }, { wch: 6 },
     ]
 
     const wb = XLSX.utils.book_new()

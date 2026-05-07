@@ -28,8 +28,9 @@ export function getNodeH(node: MindNode | undefined, customTypes: NodeTypeDef[])
   if (!node) return NODE_H
   // 根节点、维度类型保持原高度
   if (node.type === 'dimension' || !node.parentId) return NODE_H
-  // 所有其他类型：标题超出一行才增高
-  return estimateTitleWidth(node.title) > TITLE_AVAILABLE_W ? NODE_H_TALL : NODE_H
+  const tall = estimateTitleWidth(node.title) > TITLE_AVAILABLE_W
+  const extra = node.assignee ? 12 : 0
+  return (tall ? NODE_H_TALL : NODE_H) + extra
 }
 
 function slotH(nodes: Record<string, MindNode>, id: string, collapsed: Set<string>, customTypes: NodeTypeDef[]): number {

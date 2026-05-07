@@ -38,6 +38,19 @@ export const TEMPLATES: Template[] = [
     ],
   },
   {
+    id: 'monthly_plan',
+    name: '月度工作计划',
+    description: '目标驱动的月度任务拆解与分工',
+    rootType: 'dimension',
+    types: [
+      { id: 'dimension', label: '维度',     color: '#1E293B', bg: '#F1F5F9', defaultChildType: 'mo-goal' },
+      { id: 'mo-goal',   label: '目标',     color: '#E11D48', bg: '#FFF1F2', defaultChildType: 'mo-work' },
+      { id: 'mo-work',   label: '重点工作', color: '#7C3AED', bg: '#F5F3FF', wrapTitle: true, defaultChildType: 'mo-task' },
+      { id: 'mo-task',   label: '事项',     color: '#059669', bg: '#ECFDF5', wrapTitle: true, defaultChildType: 'mo-task' },
+      { id: 'pending',   label: '待定',     color: '#64748B', bg: '#F8FAFC' },
+    ],
+  },
+  {
     id: 'product',
     name: '产品管理',
     description: '面向产品规划与执行的标签体系',

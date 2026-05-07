@@ -55,6 +55,16 @@ export function NodeFocusModal({ node, customTypes, allMaps, onClose, onNavigate
               ✓ {STATUS_META.done.label}
             </span>
           )}
+          {node.status === 'in_progress' && (
+            <span style={{ fontSize: 11, color: '#2563EB', background: '#EFF6FF', padding: '3px 10px', borderRadius: 5, border: '1px solid #BFDBFE' }}>
+              ▶ {STATUS_META.in_progress.label}
+            </span>
+          )}
+          {node.assignee && (
+            <span style={{ fontSize: 11, color: '#64748B', background: '#F1F5F9', padding: '3px 10px', borderRadius: 5, border: '1px solid #E2E8F0' }}>
+              @ {node.assignee}
+            </span>
+          )}
           {node.priority && (
             <span style={{ fontSize: 11, color: PRIORITY_META[node.priority].color, fontWeight: 600 }}>
               {PRIORITY_META[node.priority].label}优先

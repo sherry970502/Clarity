@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { MindNode, NodeTypeDef, Priority, Status, getTypeMeta, PRIORITY_META } from '@/lib/types'
+import { MindNode, NodeTypeDef, Priority, Status, getTypeMeta, PRIORITY_META, STATUS_META } from '@/lib/types'
 import { TYPE_COLOR_PRESETS } from '@/lib/templates'
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
   allMaps: { id: string; title: string }[]
   currentMapId: string
   onClose: () => void
-  onUpdate: (patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'url' | 'mapLink'>>) => void
+  onUpdate: (patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'assignee' | 'url' | 'mapLink'>>) => void
   onUpdateStatus: (status?: Status) => void
   onUpdateMulti: (patch: Partial<Pick<MindNode, 'type' | 'priority'>>) => void
   onDeleteMulti: () => void
@@ -31,11 +31,13 @@ export function DetailPanel({
   const [titleValue, setTitleValue] = useState(node?.title ?? '')
   const [descValue, setDescValue] = useState(node?.description ?? '')
   const [urlValue, setUrlValue] = useState(node?.url ?? '')
+  const [assigneeValue, setAssigneeValue] = useState(node?.assignee ?? '')
 
   useEffect(() => {
     setTitleValue(node?.title ?? '')
     setDescValue(node?.description ?? '')
     setUrlValue(node?.url ?? '')
+    setAssigneeValue(node?.assignee ?? '')
   }, [node?.id])
   const [newTypeColor, setNewTypeColor] = useState(TYPE_COLOR_PRESETS[0])
 
@@ -110,6 +112,7 @@ export function DetailPanel({
   if (!node) return null
 
   const meta = getTypeMeta(node.type, customTypes)
+  const isDimension = node.type === 'dimension' || !node.parentId
   const linkedMap = node.mapLink ? allMaps.find(m => m.id === node.mapLink) : null
 
   return (
@@ -228,6 +231,25 @@ export function DetailPanel({
           )}
         </div>
 
+        {/* Assignee */}
+        {!isDimension && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>负责人</label>
+            <input
+              value={assigneeValue}
+              onChange={e => {
+                setAssigneeValue(e.target.value)
+                onUpdate({ assignee: e.target.value.trim() || undefined })
+              }}
+              placeholder="输入负责人姓名"
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+              style={inputStyle}
+              onFocus={e => (e.currentTarget.style.borderColor = '#4F46E5')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#E2E8F0')}
+            />
+          </div>
+        )}
+
         {/* URL */}
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>链接</label>
@@ -289,32 +311,32 @@ export function DetailPanel({
         </div>
 
         {/* Status */}
-        {node.type !== 'dimension' && node.type !== '' && (
+        {!isDimension && (
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>完成状态</label>
-            <button
-              onClick={() => onUpdateStatus(node.status === 'done' ? undefined : 'done')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                width: '100%', padding: '9px 12px', borderRadius: 8,
-                border: `1.5px solid ${node.status === 'done' ? '#22C55E' : '#E2E8F0'}`,
-                background: node.status === 'done' ? '#F0FDF4' : '#fff',
-                color: node.status === 'done' ? '#16A34A' : '#64748B',
-                fontSize: 13, fontWeight: node.status === 'done' ? 600 : 400,
-                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{
-                width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                border: `1.5px solid ${node.status === 'done' ? '#22C55E' : '#D1D5DB'}`,
-                background: node.status === 'done' ? '#22C55E' : 'transparent',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {node.status === 'done' && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1, fontWeight: 700 }}>✓</span>}
-              </div>
-              {node.status === 'done' ? '已完成 · 点击取消' : '标记为已完成'}
-            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {([undefined, 'in_progress', 'done'] as (Status | undefined)[]).map(s => {
+                const isActive = node.status === s
+                const color = s ? STATUS_META[s].color : '#CBD5E1'
+                const label = s ? STATUS_META[s].label : '未开始'
+                return (
+                  <button
+                    key={String(s)}
+                    onClick={() => onUpdateStatus(s)}
+                    style={{
+                      flex: 1, padding: '6px 4px', borderRadius: 6,
+                      border: `1.5px solid ${isActive ? color : '#E2E8F0'}`,
+                      background: isActive ? color + '18' : '#fff',
+                      color: isActive ? color : '#64748B',
+                      fontSize: 11, fontWeight: isActive ? 600 : 400,
+                      cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
 

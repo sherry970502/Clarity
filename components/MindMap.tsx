@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useCallback, useMemo, useState, useEffect } from 'react'
-import { MindNode, NodeTypeDef, StickyNote, getTypeMeta, PRIORITY_META } from '@/lib/types'
+import { MindNode, NodeTypeDef, StickyNote, getTypeMeta, PRIORITY_META, STATUS_META } from '@/lib/types'
 import { calcLayout, getNodeH, NODE_W, NODE_H, H_GAP } from '@/lib/layout'
 import { AppState, Action } from '@/lib/store'
 
@@ -48,6 +48,15 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
     () => calcLayout(renderNodes, rootId, collapsedIds, customTypes),
     [renderNodes, rootId, collapsedIds, customTypes],
   )
+
+  const progressMap = useMemo(() => {
+    const map: Record<string, { done: number; total: number }> = {}
+    for (const id of Object.keys(renderNodes)) {
+      const n = renderNodes[id]
+      if (n && n.children.length > 0) map[id] = getDescendantProgress(id, renderNodes)
+    }
+    return map
+  }, [renderNodes])
 
   // Compute canvas bounding box accounting for variable node heights
   const allEntries = Object.entries(positions)
@@ -327,6 +336,7 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
               dragId={dragId}
               selectedIds={selectedIds}
               customTypes={customTypes}
+              progress={progressMap[id]}
               onNavigateToMap={onNavigateToMap}
               onHoverEnter={handleHoverEnter}
               onHoverLeave={handleHoverLeave}
@@ -578,6 +588,25 @@ function HoverPreview({ node, info, customTypes }: HoverPreviewProps) {
 
 const STICKY_W = 210
 
+function getDescendantProgress(nodeId: string, nodes: Record<string, MindNode>): { done: number; total: number } {
+  let done = 0, total = 0
+  const visit = (id: string) => {
+    const n = nodes[id]
+    if (!n) return
+    for (const cid of n.children) {
+      const c = nodes[cid]
+      if (!c) continue
+      if (c.type !== 'dimension') {
+        total++
+        if (c.status === 'done') done++
+      }
+      visit(cid)
+    }
+  }
+  visit(nodeId)
+  return { done, total }
+}
+
 // ─── NodeCard ────────────────────────────────────────────────────────────────
 
 interface NodeCardProps {
@@ -588,6 +617,7 @@ interface NodeCardProps {
   dragId: string | null
   selectedIds: string[]
   customTypes: NodeTypeDef[]
+  progress?: { done: number; total: number }
   onNavigateToMap: (mapId: string) => void
   onHoverEnter: (nodeId: string, rect: DOMRect) => void
   onHoverLeave: () => void
@@ -597,7 +627,8 @@ interface NodeCardProps {
 
 function NodeCard({
   node, x, y, nodeH, selected, multiSelected, isDragging, isDropTarget, isRoot,
-  isCollapsed, isGhost, dragId, selectedIds, customTypes, onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
+  isCollapsed, isGhost, dragId, selectedIds, customTypes, progress,
+  onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
 }: NodeCardProps) {
   const [cardHovered, setCardHovered] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -619,6 +650,7 @@ function NodeCard({
   const isWrapTitle = !isDimension
   const isHighlighted = selected || multiSelected
   const isDone = node.status === 'done'
+  const isInProgress = node.status === 'in_progress'
 
   // Ghost mode: ancestor node in star view — simplified, dimmed card
   if (isGhost) {
@@ -735,6 +767,9 @@ function NodeCard({
         {!isDimension && !isEmpty && (
           <div style={{ fontSize: 10, color: meta.color, opacity: 0.7, letterSpacing: '0.03em', marginTop: 2 }}>{meta.label}</div>
         )}
+        {!isDimension && node.assignee && (
+          <div style={{ fontSize: 9, color: '#94A3B8', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{node.assignee}</div>
+        )}
       </div>
 
       {/* Right indicators */}
@@ -755,6 +790,11 @@ function NodeCard({
         {isDone && !multiSelected && (
           <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ color: '#fff', fontSize: 9, lineHeight: 1 }}>✓</span>
+          </div>
+        )}
+        {isInProgress && !multiSelected && (
+          <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: '#fff', fontSize: 8, lineHeight: 1 }}>▶</span>
           </div>
         )}
       </div>
@@ -779,26 +819,37 @@ function NodeCard({
       {isDropTarget && <div style={{ position: 'absolute', bottom: -3, left: 12, right: 12, height: 2, borderRadius: 1, background: '#4F46E5' }} />}
 
       {/* Collapse toggle */}
-      {node.children.length > 0 && (
-        <div
-          onClick={e => { e.stopPropagation(); dispatch({ type: 'TOGGLE_COLLAPSE', nodeId: node.id }) }}
-          title={isCollapsed ? `展开 ${node.children.length} 个子节点` : '折叠'}
-          style={{
-            position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)',
-            width: 18, height: 18, borderRadius: '50%',
-            background: isCollapsed ? meta.color : '#fff',
-            border: `1.5px solid ${meta.color}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', zIndex: 10,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-            transition: 'background 0.15s',
-            fontSize: 9, fontWeight: 700, lineHeight: 1,
-            color: isCollapsed ? '#fff' : meta.color,
-          }}
-        >
-          {isCollapsed ? node.children.length : '−'}
-        </div>
-      )}
+      {node.children.length > 0 && (() => {
+        const showProgress = isCollapsed && progress && progress.total > 0
+        const allDone = showProgress && progress!.done === progress!.total && progress!.total > 0
+        const bgColor = isCollapsed ? (allDone ? '#22C55E' : meta.color) : '#fff'
+        return (
+          <div
+            onClick={e => { e.stopPropagation(); dispatch({ type: 'TOGGLE_COLLAPSE', nodeId: node.id }) }}
+            title={isCollapsed ? `展开 ${node.children.length} 个子节点` : '折叠'}
+            style={{
+              position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)',
+              minWidth: 18, height: 18,
+              width: showProgress ? 'auto' : 18,
+              padding: showProgress ? '0 5px' : 0,
+              borderRadius: 9,
+              background: bgColor,
+              border: `1.5px solid ${allDone ? '#22C55E' : meta.color}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', zIndex: 10,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+              transition: 'background 0.15s',
+              fontSize: 8, fontWeight: 700, lineHeight: 1,
+              color: isCollapsed ? '#fff' : meta.color,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {isCollapsed
+              ? (showProgress ? `${progress!.done}/${progress!.total}` : node.children.length)
+              : '−'}
+          </div>
+        )
+      })()}
     </div>
   )
 }

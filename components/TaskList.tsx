@@ -4,7 +4,7 @@ import { MindNode, NodeTypeDef, Priority, Status, getTypeMeta, PRIORITY_META, ST
 
 const PRIORITY_ORDER: (Priority | null)[] = ['high', 'medium', 'low', null]
 
-type FilterStatus = 'all' | 'todo' | 'done'
+type FilterStatus = 'all' | 'todo' | 'in_progress' | 'done'
 
 interface Props {
   nodes: Record<string, MindNode>
@@ -36,13 +36,16 @@ function isUnderDimension(nodes: Record<string, MindNode>, nodeId: string, dimId
 }
 
 function cycleStatus(s?: Status): Status | undefined {
-  return s === 'done' ? undefined : 'done'
+  if (!s) return 'in_progress'
+  if (s === 'in_progress') return 'done'
+  return undefined
 }
 
 const STATUS_OPTIONS: { value: FilterStatus; label: string; color?: string }[] = [
-  { value: 'all',  label: '全部' },
-  { value: 'todo', label: '未完成' },
-  { value: 'done', label: '已完成', color: '#22C55E' },
+  { value: 'all',         label: '全部' },
+  { value: 'todo',        label: '未开始' },
+  { value: 'in_progress', label: '进行中', color: '#3B82F6' },
+  { value: 'done',        label: '已完成', color: '#22C55E' },
 ]
 
 function Chip({ label, active, color, count, onClick }: {
@@ -108,12 +111,12 @@ export function TaskList({ nodes, rootId, customTypes, onSelect, onUpdateStatus 
     ...Object.keys(byType).filter(k => byType[k].length > 0),
   ])]
 
-  // Sort each group: undone first, then by priority
+  // Sort: in_progress → todo → done, then by priority
+  function statusOrder(s?: Status): number { return s === 'in_progress' ? 0 : !s ? 1 : 2 }
   for (const id of allTypeIds) {
     byType[id]?.sort((a, b) => {
-      const dA = a.status === 'done' ? 1 : 0
-      const dB = b.status === 'done' ? 1 : 0
-      if (dA !== dB) return dA - dB
+      const oa = statusOrder(a.status), ob = statusOrder(b.status)
+      if (oa !== ob) return oa - ob
       return PRIORITY_ORDER.indexOf(a.priority) - PRIORITY_ORDER.indexOf(b.priority)
     })
   }
@@ -121,6 +124,7 @@ export function TaskList({ nodes, rootId, customTypes, onSelect, onUpdateStatus 
   // Combined filter
   const matchesNode = (n: MindNode) => {
     if (filterStatus === 'todo' && n.status) return false
+    if (filterStatus === 'in_progress' && n.status !== 'in_progress') return false
     if (filterStatus === 'done' && n.status !== 'done') return false
     if (filterDimension !== 'all' && !isUnderDimension(nodes, n.id, filterDimension)) return false
     return true
@@ -260,6 +264,8 @@ function TaskItem({ n, nodes, rootId, customTypes, onSelect, onUpdateStatus }: T
   const meta = getTypeMeta(n.type, customTypes)
   const dim = findAncestorPath(nodes, n.id, rootId)
   const isDone = n.status === 'done'
+  const isInProgress = n.status === 'in_progress'
+  const statusColor = isDone ? '#22C55E' : isInProgress ? '#3B82F6' : '#D1D5DB'
 
   return (
     <div
@@ -277,16 +283,17 @@ function TaskItem({ n, nodes, rootId, customTypes, onSelect, onUpdateStatus }: T
     >
       <div
         onClick={e => { e.stopPropagation(); onUpdateStatus(n.id, cycleStatus(n.status)) }}
-        title={n.status === 'done' ? STATUS_META.done.label : '标记状态'}
+        title={n.status ? STATUS_META[n.status].label : '点击标记进行中'}
         style={{
           width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-          border: `1.5px solid ${n.status === 'done' ? STATUS_META.done.color : '#D1D5DB'}`,
-          background: n.status === 'done' ? '#22C55E' : 'transparent',
+          border: `1.5px solid ${statusColor}`,
+          background: isDone ? '#22C55E' : isInProgress ? '#3B82F6' : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', transition: 'all 0.15s',
         }}
       >
-        {n.status === 'done' && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✓</span>}
+        {isDone && <span style={{ color: '#fff', fontSize: 9, lineHeight: 1, fontWeight: 700 }}>✓</span>}
+        {isInProgress && <span style={{ color: '#fff', fontSize: 8, lineHeight: 1 }}>▶</span>}
       </div>
 
       <div style={{ width: 3, height: 32, borderRadius: 2, background: meta.color, flexShrink: 0 }} />
@@ -295,8 +302,15 @@ function TaskItem({ n, nodes, rootId, customTypes, onSelect, onUpdateStatus }: T
         <div style={{ fontSize: 14, color: '#1E293B', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {n.title}
         </div>
-        {dim && (
-          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{dim}</div>
+        {(dim || n.assignee) && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 2, alignItems: 'center' }}>
+            {dim && <span style={{ fontSize: 11, color: '#94A3B8' }}>{dim}</span>}
+            {n.assignee && (
+              <span style={{ fontSize: 11, color: '#64748B', background: '#F1F5F9', borderRadius: 4, padding: '0 5px' }}>
+                @{n.assignee}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

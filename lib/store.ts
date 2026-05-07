@@ -81,7 +81,7 @@ export type Action =
   | { type: 'ADD_SIBLING'; nodeId: string }
   | { type: 'DELETE'; nodeId: string }
   | { type: 'DELETE_MULTI'; ids: string[] }
-  | { type: 'UPDATE'; nodeId: string; patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'status' | 'url' | 'mapLink'>> }
+  | { type: 'UPDATE'; nodeId: string; patch: Partial<Pick<MindNode, 'title' | 'description' | 'type' | 'priority' | 'status' | 'assignee' | 'url' | 'mapLink'>> }
   | { type: 'ADD_CUSTOM_TYPE'; typeDef: NodeTypeDef }
   | { type: 'UPDATE_MULTI'; ids: string[]; patch: Partial<Pick<MindNode, 'type' | 'priority'>> }
   | { type: 'MOVE_UP'; nodeId: string }
@@ -137,11 +137,13 @@ export function reducer(s: AppState, a: Action): AppState {
       const id = gid()
       const parent = s.nodes[a.parentId]
       if (!parent) return s
+      const parentTypeDef = s.customTypes.find(t => t.id === parent.type)
+      const defaultType = parentTypeDef?.defaultChildType ?? ''
       return {
         ...s,
         nodes: {
           ...s.nodes,
-          [id]: node(id, '', '', a.parentId),
+          [id]: node(id, '', defaultType, a.parentId),
           [a.parentId]: { ...parent, children: [...parent.children, id] },
         },
         selectedId: id,
@@ -163,7 +165,7 @@ export function reducer(s: AppState, a: Action): AppState {
         ...s,
         nodes: {
           ...s.nodes,
-          [id]: node(id, '', '', n.parentId),
+          [id]: node(id, '', n.type, n.parentId),
           [n.parentId]: { ...parent, children },
         },
         selectedId: id,

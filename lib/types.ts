@@ -8,7 +8,7 @@ export interface StickyNote {
   y: number
 }
 export type Priority = 'high' | 'medium' | 'low'
-export type Status = 'done'
+export type Status = 'done' | 'in_progress'
 export type ViewMode = 'mindmap' | 'list'
 
 export interface NodeTypeDef {
@@ -16,7 +16,8 @@ export interface NodeTypeDef {
   label: string
   color: string
   bg: string
-  wrapTitle?: boolean  // 不截断标题，允许换行显示
+  wrapTitle?: boolean        // 不截断标题，允许换行显示
+  defaultChildType?: string  // 添加子节点时默认使用的类型
 }
 
 export interface MindNode {
@@ -26,6 +27,7 @@ export interface MindNode {
   type: string
   priority: Priority | null
   status?: Status   // undefined = 未开始
+  assignee?: string // 负责人
   url?: string
   mapLink?: string  // 关联的另一张思维导图 ID
   starred?: boolean // 星标节点
@@ -44,7 +46,8 @@ export const NODE_TYPE_META: Record<string, { label: string; color: string; bg: 
 }
 
 export const STATUS_META: Record<Status, { label: string; color: string }> = {
-  done: { label: '已完成', color: '#22C55E' },
+  done:        { label: '已完成', color: '#22C55E' },
+  in_progress: { label: '进行中', color: '#3B82F6' },
 }
 
 export const PRIORITY_META: Record<Priority, { label: string; color: string }> = {
