@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { TEMPLATES } from '@/lib/templates'
@@ -24,6 +24,28 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id)
   const [showCreate, setShowCreate] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      }
+      if (e.key === 'Escape' && document.activeElement === searchRef.current) {
+        setSearchQuery('')
+        searchRef.current?.blur()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  const filteredMaps = searchQuery.trim()
+    ? maps.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase().trim()))
+    : maps
 
   async function createMap() {
     if (creating) return
@@ -81,12 +103,45 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
       {/* Body */}
       <div style={{ maxWidth: 860, margin: '0 auto', padding: '40px 24px' }}>
         {/* Title row */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28, gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1E293B', marginBottom: 4 }}>我的战略图</h1>
             <p style={{ fontSize: 13, color: '#94A3B8' }}>把思考和执行放在同一个地方</p>
           </div>
           <div style={{ flex: 1 }} />
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <span style={{
+              position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 13, color: '#94A3B8', pointerEvents: 'none',
+            }}>🔍</span>
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="搜索图谱…"
+              style={{
+                width: 200, padding: '7px 10px 7px 30px',
+                border: '1px solid #E2E8F0', borderRadius: 8,
+                fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                background: searchQuery ? '#fff' : '#F8FAFC',
+                color: '#1E293B', transition: 'border-color 0.15s, box-shadow 0.15s',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = '#4F46E5'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(79,70,229,0.1)' }}
+              onBlur={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.boxShadow = 'none' }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#94A3B8', fontSize: 14, padding: '0 2px', lineHeight: 1,
+                }}
+              >×</button>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: '#CBD5E1', whiteSpace: 'nowrap' }}>⌘K</div>
           <button
             onClick={() => setShowCreate(true)}
             style={{
@@ -171,9 +226,20 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
             <div style={{ fontSize: 40, marginBottom: 12 }}>🗺</div>
             <div style={{ fontSize: 15, color: '#94A3B8' }}>还没有战略图，点击「新建」开始</div>
           </div>
+        ) : filteredMaps.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '80px 0' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
+            <div style={{ fontSize: 14, color: '#94A3B8' }}>没有匹配「{searchQuery}」的图谱</div>
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{ marginTop: 12, fontSize: 12, color: '#4F46E5', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              清除搜索
+            </button>
+          </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
-            {maps.map(m => (
+            {filteredMaps.map(m => (
               <div
                 key={m.id}
                 style={{
