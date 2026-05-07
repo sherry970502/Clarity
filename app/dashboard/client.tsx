@@ -24,6 +24,7 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id)
   const [showCreate, setShowCreate] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [duplicating, setDuplicating] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -69,6 +70,14 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
     await fetch(`/api/maps/${id}`, { method: 'DELETE' })
     setMaps(prev => prev.filter(m => m.id !== id))
     setDeleting(null)
+  }
+
+  async function duplicateMap(id: string) {
+    setDuplicating(id)
+    const res = await fetch(`/api/maps/${id}/duplicate`, { method: 'POST' })
+    const copy = await res.json()
+    setMaps(prev => [copy, ...prev])
+    setDuplicating(null)
   }
 
   function formatDate(d: Date | string) {
@@ -260,9 +269,27 @@ export function DashboardClient({ maps: initialMaps, userName }: Props) {
                 <div style={{ fontSize: 11, color: '#94A3B8' }}>
                   更新于 {formatDate(m.updatedAt)}
                 </div>
+                {/* Duplicate button */}
+                <button
+                  onClick={e => { e.stopPropagation(); duplicateMap(m.id) }}
+                  disabled={duplicating === m.id}
+                  title="复制图谱"
+                  style={{
+                    position: 'absolute', top: 12, right: 34,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: '#CBD5E1', fontSize: 12, padding: '2px 4px', borderRadius: 4,
+                    opacity: duplicating === m.id ? 0.4 : 1,
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#4F46E5')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#CBD5E1')}
+                >
+                  {duplicating === m.id ? '…' : '⧉'}
+                </button>
+                {/* Delete button */}
                 <button
                   onClick={e => { e.stopPropagation(); deleteMap(m.id) }}
                   disabled={deleting === m.id}
+                  title="删除图谱"
                   style={{
                     position: 'absolute', top: 12, right: 12,
                     background: 'none', border: 'none', cursor: 'pointer',
