@@ -29,6 +29,7 @@ export function DashboardClient({ maps: initialMaps, collaboratedMaps: initialCo
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id)
   const [showCreate, setShowCreate] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
   const [duplicating, setDuplicating] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
@@ -70,11 +71,11 @@ export function DashboardClient({ maps: initialMaps, collaboratedMaps: initialCo
   }
 
   async function deleteMap(id: string) {
-    if (!confirm('确认删除这张战略图？')) return
     setDeleting(id)
     await fetch(`/api/maps/${id}`, { method: 'DELETE' })
     setMaps(prev => prev.filter(m => m.id !== id))
     setDeleting(null)
+    setConfirmDelete(null)
   }
 
   async function duplicateMap(id: string) {
@@ -298,7 +299,7 @@ export function DashboardClient({ maps: initialMaps, collaboratedMaps: initialCo
                 </button>
                 {/* Delete button */}
                 <button
-                  onClick={e => { e.stopPropagation(); deleteMap(m.id) }}
+                  onClick={e => { e.stopPropagation(); setConfirmDelete({ id: m.id, title: m.title }) }}
                   disabled={deleting === m.id}
                   title="删除图谱"
                   style={{
@@ -357,6 +358,50 @@ export function DashboardClient({ maps: initialMaps, collaboratedMaps: initialCo
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 12, padding: 28, width: 380, boxShadow: '0 8px 32px rgba(0,0,0,0.16)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#1E293B' }}>删除图谱</h2>
+            <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748B', lineHeight: 1.6 }}>
+              确认删除 <strong style={{ color: '#1E293B' }}>「{confirmDelete.title}」</strong>？<br />
+              删除后无法恢复。
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                style={{
+                  padding: '8px 20px', borderRadius: 8, border: '1px solid #E2E8F0',
+                  background: '#fff', color: '#64748B', fontSize: 13,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={() => deleteMap(confirmDelete.id)}
+                disabled={deleting === confirmDelete.id}
+                style={{
+                  padding: '8px 20px', borderRadius: 8, border: 'none',
+                  background: deleting === confirmDelete.id ? '#FCA5A5' : '#EF4444',
+                  color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: deleting === confirmDelete.id ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {deleting === confirmDelete.id ? '删除中…' : '确认删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
