@@ -357,6 +357,7 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
               isHighlight={highlightId === id}
               dragId={dragId}
               selectedIds={selectedIds}
+              nodes={nodes}
               customTypes={customTypes}
               progress={progressMap[id]}
               onNavigateToMap={onNavigateToMap}
@@ -612,10 +613,13 @@ const STICKY_W = 210
 
 function getDescendantProgress(nodeId: string, nodes: Record<string, MindNode>): { done: number; total: number } {
   let done = 0, total = 0
+  const visited = new Set<string>()
   const visit = (id: string) => {
     const n = nodes[id]
     if (!n) return
     for (const cid of n.children) {
+      if (visited.has(cid)) continue
+      visited.add(cid)
       const c = nodes[cid]
       if (!c) continue
       if (c.type !== 'dimension') {
@@ -638,6 +642,7 @@ interface NodeCardProps {
   isCollapsed: boolean; isGhost: boolean; isHighlight: boolean
   dragId: string | null
   selectedIds: string[]
+  nodes: Record<string, MindNode>
   customTypes: NodeTypeDef[]
   progress?: { done: number; total: number }
   onNavigateToMap: (mapId: string) => void
@@ -649,7 +654,7 @@ interface NodeCardProps {
 
 function NodeCard({
   node, x, y, nodeH, selected, multiSelected, isDragging, isDropTarget, isRoot,
-  isCollapsed, isGhost, isHighlight, dragId, selectedIds, customTypes, progress,
+  isCollapsed, isGhost, isHighlight, dragId, selectedIds, nodes, customTypes, progress,
   onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
 }: NodeCardProps) {
   const [cardHovered, setCardHovered] = useState(false)
@@ -850,7 +855,7 @@ function NodeCard({
         return (
           <div
             onClick={e => { e.stopPropagation(); dispatch({ type: 'TOGGLE_COLLAPSE', nodeId: node.id }) }}
-            title={isCollapsed ? `展开 ${node.children.length} 个子节点` : '折叠'}
+            title={isCollapsed ? `展开 ${node.children.filter(id => nodes[id]).length} 个子节点` : '折叠'}
             style={{
               position: 'absolute', right: -10, top: '50%', transform: 'translateY(-50%)',
               minWidth: 18, height: 18,
@@ -869,7 +874,7 @@ function NodeCard({
             }}
           >
             {isCollapsed
-              ? (showProgress ? `${progress!.done}/${progress!.total}` : node.children.length)
+              ? (showProgress ? `${progress!.done}/${progress!.total}` : node.children.filter(id => nodes[id]).length)
               : '−'}
           </div>
         )
