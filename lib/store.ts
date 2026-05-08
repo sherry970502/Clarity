@@ -107,6 +107,7 @@ export type Action =
   | { type: 'MOVE_STICKY'; id: string; x: number; y: number }
   | { type: 'DELETE_STICKY'; id: string }
   | { type: 'CONVERT_STICKY'; id: string; parentId: string }
+  | { type: 'NAVIGATE_TO_NODE'; nodeId: string }
 
 export function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
@@ -437,6 +438,24 @@ export function reducer(s: AppState, a: Action): AppState {
         selectedId: id,
         selectedIds: [id],
         newNodeId: id,
+      }
+    }
+
+    case 'NAVIGATE_TO_NODE': {
+      const n = s.nodes[a.nodeId]
+      if (!n) return s
+      const ancestors = new Set<string>()
+      let cur: MindNode | undefined = n
+      while (cur?.parentId) {
+        ancestors.add(cur.parentId)
+        cur = s.nodes[cur.parentId]
+      }
+      return {
+        ...s,
+        collapsedIds: s.collapsedIds.filter(id => !ancestors.has(id)),
+        selectedId: a.nodeId,
+        selectedIds: [a.nodeId],
+        ctx: null,
       }
     }
 

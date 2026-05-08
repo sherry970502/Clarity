@@ -11,6 +11,9 @@ interface Props {
   starView: boolean
   onNavigateToMap: (mapId: string) => void
   onFocusNode: (nodeId: string) => void
+  navigateToNodeId?: string | null
+  onNavigated?: (nodeId: string) => void
+  highlightId?: string | null
 }
 
 interface DragBox { x: number; y: number; w: number; h: number }
@@ -21,7 +24,7 @@ interface HoverInfo {
   left: number; top: number; right: number; bottom: number
 }
 
-export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMap, onFocusNode }: Props) {
+export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMap, onFocusNode, navigateToNodeId, onNavigated, highlightId }: Props) {
   const { nodes, rootId, selectedId, selectedIds, panX, panY, scale, dragId, dropId, collapsedIds, stickyNotes } = state
 
   // Star view: compute which nodes to show (starred + their ancestors)
@@ -92,6 +95,24 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
     window.addEventListener('keyup', up)
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up) }
   }, [])
+
+  // Pan canvas to center on the target node after surgical expand
+  useEffect(() => {
+    if (!navigateToNodeId) return
+    const pos = positions[navigateToNodeId]
+    if (!pos) return
+    const container = containerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const nodeH = getNodeH(nodes[navigateToNodeId], customTypes)
+    const cx = pos.x - minX
+    const cy = pos.y - minY
+    const newPanX = rect.width / 2 - (cx + NODE_W / 2) * scale
+    const newPanY = rect.height / 2 - (cy + nodeH / 2) * scale
+    dispatch({ type: 'ZOOM', scale, panX: newPanX, panY: newPanY })
+    onNavigated?.(navigateToNodeId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigateToNodeId, positions])
 
   const handleHoverEnter = useCallback((nodeId: string, rect: DOMRect) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
@@ -333,6 +354,7 @@ export function MindMap({ state, dispatch, customTypes, starView, onNavigateToMa
               isRoot={!n.parentId}
               isCollapsed={collapsedIds.includes(id)}
               isGhost={isGhost}
+              isHighlight={highlightId === id}
               dragId={dragId}
               selectedIds={selectedIds}
               customTypes={customTypes}
@@ -613,7 +635,7 @@ interface NodeCardProps {
   node: MindNode; x: number; y: number; nodeH: number
   selected: boolean; multiSelected: boolean
   isDragging: boolean; isDropTarget: boolean; isRoot: boolean
-  isCollapsed: boolean; isGhost: boolean
+  isCollapsed: boolean; isGhost: boolean; isHighlight: boolean
   dragId: string | null
   selectedIds: string[]
   customTypes: NodeTypeDef[]
@@ -627,7 +649,7 @@ interface NodeCardProps {
 
 function NodeCard({
   node, x, y, nodeH, selected, multiSelected, isDragging, isDropTarget, isRoot,
-  isCollapsed, isGhost, dragId, selectedIds, customTypes, progress,
+  isCollapsed, isGhost, isHighlight, dragId, selectedIds, customTypes, progress,
   onNavigateToMap, onHoverEnter, onHoverLeave, onFocusNode, dispatch,
 }: NodeCardProps) {
   const [cardHovered, setCardHovered] = useState(false)
@@ -688,16 +710,18 @@ function NodeCard({
     : isDimension ? '0 2px 8px rgba(0,0,0,0.06)' : '0 1px 4px rgba(0,0,0,0.06)'
 
   return (
-    <div data-node={node.id} style={{
-      position: 'absolute', left: x, top: y,
-      width: NODE_W, height: nodeH,
-      background: bg, border,
-      borderRadius: isDimension ? 10 : 8, boxShadow: shadow,
-      display: 'flex', alignItems: 'center', cursor: 'pointer',
-      opacity: isDragging ? 0.4 : isDone ? 0.55 : 1,
-      transition: 'box-shadow 0.15s, border-color 0.15s, opacity 0.15s',
-      userSelect: 'none',
-    }}
+    <div data-node={node.id}
+      className={isHighlight ? 'node-search-highlight' : undefined}
+      style={{
+        position: 'absolute', left: x, top: y,
+        width: NODE_W, height: nodeH,
+        background: bg, border,
+        borderRadius: isDimension ? 10 : 8, boxShadow: shadow,
+        display: 'flex', alignItems: 'center', cursor: 'pointer',
+        opacity: isDragging ? 0.4 : isDone ? 0.55 : 1,
+        transition: 'box-shadow 0.15s, border-color 0.15s, opacity 0.15s',
+        userSelect: 'none',
+      }}
       draggable={!isRoot && !isEditing}
       onClick={e => { e.stopPropagation(); e.shiftKey ? dispatch({ type: 'MULTI_SELECT', id: node.id }) : dispatch({ type: 'SELECT', id: node.id }) }}
       onDoubleClick={e => { e.stopPropagation(); onFocusNode(node.id) }}

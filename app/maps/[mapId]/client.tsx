@@ -10,6 +10,7 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { MindNode, NodeTypeDef, Priority, StickyNote, getTypeMeta, PRIORITY_META } from '@/lib/types'
 import { ShareModal } from '@/components/ShareModal'
 import { NodeFocusModal } from '@/components/NodeFocusModal'
+import { SearchModal } from '@/components/SearchModal'
 
 function exportToExcel(nodes: Record<string, MindNode>, rootId: string, customTypes: NodeTypeDef[], mapTitle: string) {
   import('xlsx').then(XLSX => {
@@ -231,6 +232,10 @@ export function MapClient({
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showCollabModal, setShowCollabModal] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [navigateToNodeId, setNavigateToNodeId] = useState<string | null>(null)
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [starView, setStarView] = useState(false)
   const router = useRouter()
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
@@ -329,8 +334,28 @@ export function MapClient({
     router.push(`/maps/${targetMapId}?from=${mapId}`)
   }, [router, mapId])
 
+  const handleSearchNavigate = useCallback((nodeId: string) => {
+    setShowSearch(false)
+    setStarView(false)
+    dispatch({ type: 'SET_VIEW', view: 'mindmap' })
+    dispatch({ type: 'NAVIGATE_TO_NODE', nodeId })
+    setNavigateToNodeId(nodeId)
+  }, [dispatch])
+
+  const handleNavigated = useCallback((nodeId: string) => {
+    setNavigateToNodeId(null)
+    setHighlightId(nodeId)
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current)
+    highlightTimerRef.current = setTimeout(() => setHighlightId(null), 1500)
+  }, [])
+
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      e.preventDefault()
+      setShowSearch(true)
+      return
+    }
     const sel = state.selectedId
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
@@ -477,6 +502,23 @@ export function MapClient({
         )}
 
         <button
+          onClick={() => setShowSearch(true)}
+          style={{
+            padding: '5px 14px', borderRadius: 8, border: '1px solid #E2E8F0',
+            background: '#fff', color: '#64748B',
+            fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+          title="搜索节点 (⌘F)"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          搜索
+        </button>
+
+        <button
           onClick={() => exportToExcel(state.nodes, state.rootId, state.customTypes, title)}
           style={{
             padding: '5px 14px', borderRadius: 8, border: '1px solid #E2E8F0',
@@ -557,6 +599,9 @@ export function MapClient({
             starView={starView}
             onNavigateToMap={handleNavigateToMap}
             onFocusNode={setFocusedNodeId}
+            navigateToNodeId={navigateToNodeId}
+            onNavigated={handleNavigated}
+            highlightId={highlightId}
           />
         ) : (
           <TaskList
@@ -588,6 +633,17 @@ export function MapClient({
           onNavigateToMap={handleNavigateToMap}
         />
       </div>
+
+      {showSearch && (
+        <SearchModal
+          nodes={state.nodes}
+          rootId={state.rootId}
+          customTypes={state.customTypes}
+          collapsedIds={state.collapsedIds}
+          onNavigate={handleSearchNavigate}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       {showCollabModal && (
         <CollaboratorModal mapId={mapId} onClose={() => setShowCollabModal(false)} />
