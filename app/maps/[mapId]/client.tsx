@@ -11,6 +11,7 @@ import { MindNode, NodeTypeDef, Priority, StickyNote, getTypeMeta, PRIORITY_META
 import { ShareModal } from '@/components/ShareModal'
 import { NodeFocusModal } from '@/components/NodeFocusModal'
 import { SearchModal } from '@/components/SearchModal'
+import { parseMarkdownToNodes } from '@/lib/parseMarkdown'
 
 function exportToExcel(nodes: Record<string, MindNode>, rootId: string, customTypes: NodeTypeDef[], mapTitle: string) {
   import('xlsx').then(XLSX => {
@@ -236,6 +237,14 @@ export function MapClient({
   const [navigateToNodeId, setNavigateToNodeId] = useState<string | null>(null)
   const [highlightId, setHighlightId] = useState<string | null>(null)
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const [importPreview, setImportPreview] = useState<{
+    nodes: Record<string, import('@/lib/types').MindNode>
+    rootId: string
+    nodeCount: number
+    fileName: string
+  } | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
   const [starView, setStarView] = useState(false)
   const router = useRouter()
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
@@ -298,12 +307,13 @@ export function MapClient({
         body: JSON.stringify({
           nodesJson: JSON.stringify(state.nodes),
           stickyNotesJson: JSON.stringify(state.stickyNotes),
+          rootId: state.rootId,
         }),
       })
       setSaveStatus('saved')
     }, 1200)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.nodes, state.stickyNotes, mapId])
+  }, [state.nodes, state.stickyNotes, state.rootId, mapId])
 
   // Auto-save customTypes when they change
   useEffect(() => {
@@ -333,6 +343,29 @@ export function MapClient({
   const handleNavigateToMap = useCallback((targetMapId: string) => {
     router.push(`/maps/${targetMapId}?from=${mapId}`)
   }, [router, mapId])
+
+  const handleImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const content = ev.target?.result as string
+      const result = parseMarkdownToNodes(content, file.name)
+      if (!result) {
+        setImportError('未能解析该文件，请确认是标题（# ## ###）或列表（- item）格式的 Markdown。')
+        return
+      }
+      setImportPreview({ ...result, fileName: file.name })
+    }
+    reader.readAsText(file)
+  }, [])
+
+  const handleImportConfirm = useCallback(() => {
+    if (!importPreview) return
+    dispatch({ type: 'IMPORT_NODES', nodes: importPreview.nodes, rootId: importPreview.rootId })
+    setImportPreview(null)
+  }, [importPreview, dispatch])
 
   const handleSearchNavigate = useCallback((nodeId: string) => {
     setShowSearch(false)
@@ -518,6 +551,25 @@ export function MapClient({
           搜索
         </button>
 
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".md"
+          style={{ display: 'none' }}
+          onChange={handleImportFile}
+        />
+        <button
+          onClick={() => importInputRef.current?.click()}
+          style={{
+            padding: '5px 14px', borderRadius: 8, border: '1px solid #E2E8F0',
+            background: '#fff', color: '#64748B',
+            fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+          }}
+          title="导入 Markdown 文件"
+        >
+          导入
+        </button>
+
         <button
           onClick={() => exportToExcel(state.nodes, state.rootId, state.customTypes, title)}
           style={{
@@ -633,6 +685,68 @@ export function MapClient({
           onNavigateToMap={handleNavigateToMap}
         />
       </div>
+
+      {/* Markdown import confirmation */}
+      {importPreview && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 900 }}
+          onClick={() => setImportPreview(null)}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 14, padding: 28, width: 400, boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1E293B', marginBottom: 8 }}>导入 Markdown</div>
+            <div style={{ fontSize: 13, color: '#64748B', marginBottom: 6 }}>
+              文件：<span style={{ fontWeight: 600, color: '#1E293B' }}>{importPreview.fileName}</span>
+            </div>
+            <div style={{ fontSize: 13, color: '#64748B', marginBottom: 20 }}>
+              共解析出 <span style={{ fontWeight: 600, color: '#4F46E5' }}>{importPreview.nodeCount}</span> 个节点
+            </div>
+            <div style={{ fontSize: 12, color: '#F59E0B', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '10px 14px', marginBottom: 24 }}>
+              导入后当前图谱内容将被替换，此操作不可撤销。
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setImportPreview(null)}
+                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', color: '#64748B', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleImportConfirm}
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#4F46E5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                确认导入
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import error */}
+      {importError && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 900 }}
+          onClick={() => setImportError(null)}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 14, padding: 28, width: 380, boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#EF4444', marginBottom: 12 }}>解析失败</div>
+            <div style={{ fontSize: 13, color: '#64748B', marginBottom: 24, lineHeight: 1.6 }}>{importError}</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setImportError(null)}
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#4F46E5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                好的
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showSearch && (
         <SearchModal

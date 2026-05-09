@@ -108,6 +108,7 @@ export type Action =
   | { type: 'DELETE_STICKY'; id: string }
   | { type: 'CONVERT_STICKY'; id: string; parentId: string }
   | { type: 'NAVIGATE_TO_NODE'; nodeId: string }
+  | { type: 'IMPORT_NODES'; nodes: Record<string, MindNode>; rootId: string }
 
 export function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
@@ -440,6 +441,20 @@ export function reducer(s: AppState, a: Action): AppState {
         newNodeId: id,
       }
     }
+
+    case 'IMPORT_NODES':
+      return {
+        ...s,
+        nodes: a.nodes,
+        rootId: a.rootId,
+        selectedId: null,
+        selectedIds: [],
+        collapsedIds: [],
+        stickyNotes: [],
+        ctx: null,
+        panX: 0,
+        panY: 0,
+      }
 
     case 'NAVIGATE_TO_NODE': {
       const n = s.nodes[a.nodeId]
